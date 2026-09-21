@@ -13,9 +13,9 @@ workflows:
     environment:
       ios_signing:
         distribution_type: app_store
-        bundle_identifier: de.example.beatbox
+        bundle_identifier: de.LaraJade.beatbox
       vars:
-        APP_STORE_APPLE_ID: 0000000000
+        APP_STORE_APPLE_ID: 6814647151
       xcode: latest
     scripts:
       - name: Web-Paket und iOS-Hülle prüfen

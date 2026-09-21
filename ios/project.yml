@@ -4,7 +4,7 @@
 #
 # Vor dem ersten Build anpassen: PRODUCT_BUNDLE_IDENTIFIER (identisch in codemagic.yaml).
 
-name: BeatBox
+name: BeatBox Reaction
 
 options:
   deploymentTarget:
@@ -63,7 +63,7 @@ targets:
     settings:
       base:
         PRODUCT_NAME: BeatBox
-        PRODUCT_BUNDLE_IDENTIFIER: de.example.beatbox
+        PRODUCT_BUNDLE_IDENTIFIER: de.larajade.beatbox
         MARKETING_VERSION: "1.0"
         CURRENT_PROJECT_VERSION: "1"
         VERSIONING_SYSTEM: apple-generic
