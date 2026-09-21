@@ -1,0 +1,55 @@
+# BeatBox — Codemagic-Konfiguration: Web-Paket pruefen, iOS bauen, zu TestFlight laden.
+# Voraussetzungen (in Codemagic unter "Environment variables" / "Code signing identities"):
+#   Environment-Gruppe "appstore-connect" mit:
+#     APP_STORE_CONNECT_ISSUER_ID, APP_STORE_CONNECT_KEY_ID,
+#     APP_STORE_CONNECT_PRIVATE_KEY (Inhalt der .p8), TEAM_ID
+#   Code signing: iOS Distribution Zertifikat + App Store Provisioning Profile.
+workflows:
+  ios-testflight:
+    name: iOS Build zu TestFlight
+    instance_type: mac_mini_m1
+    max_build_duration: 60
+    environment:
+      ios: latest
+      xcode: latest
+      node: 20
+      groups:
+        - appstore-connect
+    triggering:
+      events:
+        - tag
+      tag_patterns:
+        - pattern: v*.*.*
+          include: true
+      cancel_previous_builds: true
+    scripts:
+      - name: Web-Paket pruefen
+        script: node boxreaktion/tools/pruefung.js
+      - name: Projekt erzeugen
+        script: brew install xcodegen >/dev/null && cd ios && xcodegen
+      - name: Buildnummer aus Tag setzen
+        script: |
+          BUILDNUM=$(echo "$CM_TAG" | tr -d 'v.')
+          /usr/libexec/PlistBuddy -c "Set :CFBundleVersion $BUILDNUM" ios/BeatBox/Resources/Info.plist
+      - name: Archivieren
+        script: |
+          cd ios
+          xcodebuild -project BeatBox.xcodeproj -scheme BeatBox             -configuration Release             -archivePath build/BeatBox.xcarchive             archive             CODE_SIGN_STYLE=Manual             DEVELOPMENT_TEAM="$TEAM_ID"
+      - name: Exportieren und zu TestFlight hochladen
+        script: |
+          cd ios
+          xcodebuild -exportArchive             -archivePath build/BeatBox.xcarchive             -exportPath build             -exportOptionsPlist exportOptions.plist             -allowProvisioningUpdates
+    artifacts:
+      - ios/build/*.ipa
+      - ios/build/*.dSYM.zip
+    publishing:
+      app_store_connect:
+        api_key: $APP_STORE_CONNECT_PRIVATE_KEY
+        api_issuer: $APP_STORE_CONNECT_ISSUER_ID
+        api_key_id: $APP_STORE_CONNECT_KEY_ID
+        submit_to_testflight: true
+        submit_to_app_store: false
+    cache:
+      cache_paths:
+        - ~/.pub-cache
+        - $CM_BUILD_DIR/node_modules

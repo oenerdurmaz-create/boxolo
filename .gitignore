@@ -1,0 +1,10 @@
+ios/build/
+ios/*.xcodeproj/
+ios/*.xcworkspace/
+xcuserdata/
+*.xcarchive
+*.ipa
+*.dSYM.zip
+DerivedData/
+node_modules/
+.DS_Store

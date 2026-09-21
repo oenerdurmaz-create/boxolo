@@ -1,403 +1,401 @@
-"use strict";
-/* BeatBox - Oberflaeche, Navigation, Eingabe, Zeichnung.
-   Eingaben auf den Zonen laufen ueber pointerdown mit event.timeStamp.
-   Der Bildschirmtakt (requestAnimationFrame) treibt Soundplaner und Logik. */
-
+/* BeatBox — Bildschirmverwaltung, Eingabe, Render-Loop, Kalibrierung, Verlauf. */
 (function () {
-  const $ = id => document.getElementById(id);
-  const MODI_LISTE = ["reaktion", "timing", "kombination", "ausdauer", "rhythmus"];
-  const SCREENS = ["menu", "modes", "levels", "game", "pause", "result", "highscores", "history", "calibrate", "help"];
+  "use strict";
 
-  let sprache = Store.sprache() === "en" ? "en" : "de";
-  let aktuellerScreen = "menu";
-  let gewaehlterModus = "reaktion";
-  let aktuelleMap = null;
-  let letztesErgebnis = null;
-  let hsModus = "reaktion", hsLevel = 1;
-  let letzterZustand = "", losFrames = 0, previewFrames = 0;
-  const zoneEls = [];
-  const Kalib = { aktiv: false, taps: [], letzterBeat: -999 };
+  var I18N = window.BEATBOX_I18N;
+  var STORAGE = window.BEATBOX_STORAGE;
+  var LEVELS = window.BEATBOX_LEVELS;
+  var validateLevel = window.BEATBOX_validateLevel;
+  var AUDIO = window.BEATBOX_AUDIO;
+  var GAME = window.BEATBOX_GAME;
 
-  /* ---------- Texte ---------- */
-  function t(pfad, ersetzung) {
-    let knoten = TEXTS[sprache];
-    const teile = pfad.split(".");
-    for (const teil of teile) {
-      if (knoten == null) return pfad;
-      knoten = knoten[teil];
+  var lang = STORAGE.getLanguage();
+  var currentScreen = "menu";
+  var ausgewaehlterModus = null;
+  var laufendesLevel = null;
+  var calibration = null; /* {soll: number[], ist: [], aktiv: bool} */
+
+  function t(schluessel, params) {
+    var satz = (I18N[lang] && I18N[lang][schluessel]) || schluessel;
+    if (params) {
+      Object.keys(params).forEach(function (k) {
+        satz = satz.replace("{" + k + "}", params[k]);
+      });
     }
-    let s = (typeof knoten === "string") ? knoten : pfad;
-    if (ersetzung) for (const k in ersetzung) s = s.split("{" + k + "}").join(String(ersetzung[k]));
-    return s;
-  }
-  function esc(s) { return String(s).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;"); }
-  function gross(s) { return s.charAt(0).toUpperCase() + s.slice(1); }
-
-  function texteAnwenden() {
-    document.documentElement.lang = sprache;
-    document.querySelectorAll("[data-i18n]").forEach(el => { el.textContent = t(el.getAttribute("data-i18n")); });
-    $("btnLangDE").classList.toggle("aktiv", sprache === "de");
-    $("btnLangEN").classList.toggle("aktiv", sprache === "en");
-    kalibrierungAnzeigen();
-    modusListeRendern();
-    hilfeRendern();
+    return satz;
   }
 
-  /* ---------- Navigation ---------- */
-  function zeige(name) {
-    SCREENS.forEach(s => $("screen-" + s).classList.toggle("versteckt", s !== name));
-    $("btnBack").classList.toggle("versteckt", name === "menu");
-    aktuellerScreen = name;
+  function $(id) { return document.getElementById(id); }
+  function alleZonen() { return Array.prototype.slice.call(document.querySelectorAll(".zone")); }
+
+  /* ---------- Bildschirme ---------- */
+  var SCREENS = ["menu", "levels", "game", "result", "help", "history", "calib"];
+  function zeige(screen) {
+    currentScreen = screen;
+    SCREENS.forEach(function (s) {
+      $("screen-" + s).classList.toggle("hidden", s !== screen);
+    });
+    $("btn-back").classList.toggle("hidden", screen === "menu");
+    if (screen === "history") { zeichneVerlauf(); }
+    if (screen === "menu") { aktualisiereCalibStatus(); }
   }
 
-  /* ---------- Audio ---------- */
-  function audioBereit() {
-    if (!AudioEngine.erzeugt()) AudioEngine.bauen();
-    AudioEngine.fortsetzen();
-    AudioEngine.sync();
+  function setzeTexte() {
+    document.querySelectorAll("[data-i18n]").forEach(function (el) {
+      el.textContent = t(el.getAttribute("data-i18n"));
+    });
+    $("btn-lang").textContent = lang === "de" ? "EN" : "DE";
+    alleZonen().forEach(function (z) {
+      z.querySelector(".zlabel").textContent = t("zone_" + z.getAttribute("data-zone"));
+    });
+    baueModusliste();
+    if (ausgewaehlterModus) { baueLevelGrid(); }
   }
 
-  /* ---------- Menue / Auswahllisten ---------- */
-  function kalibrierungAnzeigen() {
-    const k = Store.kalibrierungMs();
-    $("calibInfo").textContent = k == null ? t("menu.calibNone") : t("menu.calibValue", { ms: k });
-  }
-
-  function modusListeRendern() {
-    const box = $("modeList"); box.innerHTML = "";
-    for (const m of MODI_LISTE) {
-      const b = document.createElement("button");
-      b.className = "moduskarte modus-" + m;
-      b.innerHTML = "<b>" + esc(t("modes." + m)) + "</b><span>" + esc(t("modes.desc" + gross(m))) + "</span>";
-      b.addEventListener("click", () => { gewaehlterModus = m; levelsListeRendern(); zeige("levels"); });
+  /* ---------- Menü ---------- */
+  var MODI = ["reaktion", "timing", "kombination", "ausdauer", "rhythmus"];
+  function baueModusliste() {
+    var box = $("mode-list");
+    box.innerHTML = "";
+    MODI.forEach(function (m) {
+      var b = document.createElement("button");
+      b.className = "modebtn";
+      var h = document.createElement("h3");
+      h.textContent = t("mode_" + m);
+      var p = document.createElement("p");
+      p.textContent = t("mode_desc_" + m);
+      b.appendChild(h);
+      b.appendChild(p);
+      b.addEventListener("pointerdown", function (ev) {
+        ev.preventDefault();
+        AUDIO.ensure();
+        ausgewaehlterModus = m;
+        baueLevelGrid();
+        zeige("levels");
+      });
       box.appendChild(b);
-    }
+    });
   }
 
-  function levelsListeRendern() {
-    $("levelsTitle").textContent = t("modes." + gewaehlterModus) + " · " + t("levels.title");
-    const box = $("levelList"); box.innerHTML = "";
-    for (let l = 1; l <= 10; l++) {
-      const karte = Levels.BEATMAPS.find(x => x.modus === gewaehlterModus && x.level === l);
-      if (!karte) continue;
-      const b = document.createElement("button");
-      b.className = "levelknopf";
-      b.innerHTML = "<b>" + esc(t("levels.level", { n: l })) + "</b><span>" +
-        karte.bpm + " BPM · ±" + karte.trefferfenster_ms + " ms</span>";
-      b.addEventListener("click", () => levelStarten(karte));
-      box.appendChild(b);
+  function levelFuer(modus, n) {
+    for (var i = 0; i < LEVELS.length; i++) {
+      if (LEVELS[i].modus === modus && LEVELS[i].level === n) { return LEVELS[i]; }
     }
+    return null;
   }
 
-  /* ---------- Spiel ---------- */
-  function levelStarten(karte) {
-    audioBereit();
-    Game.start(karte, { onJudge: urteilZeigen, onEnde: rundeBeendet });
-    aktuelleMap = karte;
-    letzterZustand = ""; losFrames = 0; previewFrames = 0;
+  function baueLevelGrid() {
+    $("levels-mode-title").textContent = t("mode_" + ausgewaehlterModus);
+    $("levels-desc").textContent = t("mode_desc_" + ausgewaehlterModus);
+    var grid = $("level-grid");
+    grid.innerHTML = "";
+    for (var n = 1; n <= 10; n++) {
+      (function (lvl) {
+        var b = document.createElement("button");
+        b.className = "levelbtn";
+        b.textContent = t("level_x", { n: lvl });
+        b.addEventListener("pointerdown", function (ev) {
+          ev.preventDefault();
+          AUDIO.ensure();
+          starteSpiel(ausgewaehlterModus, lvl);
+        });
+        grid.appendChild(b);
+      })(n);
+    }
+    var best = $("best-score");
+    var bestTxt = "";
+    for (var n2 = 1; n2 <= 10; n2++) {
+      var e = STORAGE.getBest(ausgewaehlterModus, n2);
+      if (e) { bestTxt += t("level_x", { n: n2 }) + ": " + e.punkte + "   "; }
+    }
+    best.textContent = bestTxt ? (t("best_label") + ": " + bestTxt) : t("no_scores_yet");
+  }
+
+  /* ---------- Spielstart / Ergebnis ---------- */
+  function starteSpiel(modus, lvl) {
+    var levelDef = levelFuer(modus, lvl);
+    var res = GAME.start(modus, levelDef, STORAGE.getCalibration(), AUDIO.getTime() + 0.1, validateLevel);
+    if (res.fehler) {
+      zeige("menu");
+      return;
+    }
+    laufendesLevel = { modus: modus, lvl: lvl };
+    $("distractor-note").classList.toggle("hidden", !(levelDef.stoerziele > 0));
     zeige("game");
   }
 
-  function urteilZeigen(zone, key, ms, richt) {
-    const el = zoneEls[zone]; if (!el) return;
-    const div = document.createElement("div");
-    div.className = "urteil urteil-" + key;
-    let text = t("judge." + key);
-    if (ms != null) {
-      const r = Math.round(ms);
-      text += " " + (r < 0 ? "−" : "+") + Math.abs(r) + " ms";
-      if (Math.abs(ms) > 40 && richt) text += " · " + t("judge." + richt);
-    } else if (richt) text += " · " + t("judge." + richt);
-    div.textContent = text;
-    div.addEventListener("animationend", () => div.remove());
-    el.appendChild(div);
-    if (navigator.vibrate) { try { navigator.vibrate(key === "perfect" ? 12 : key === "miss" ? 40 : 25); } catch (e) { /* nicht verfuegbar */ } }
-  }
-
-  function rundeBeendet(erg) {
-    letztesErgebnis = erg;
-    $("resMode").textContent = t("modes." + erg.modus) + " · " + t("levels.level", { n: erg.level });
-    $("resScore").textContent = String(erg.punkte);
-    $("resQuote").textContent = erg.quote + "%";
-    $("resHits").textContent = erg.treffer + "/" + erg.zieleGesamt;
-    $("resStreak").textContent = String(erg.serie);
-    $("resReaction").textContent = erg.reaktionMittel != null ? erg.reaktionMittel + " ms" : "–";
-    $("rowBest").hidden = erg.reaktionBest == null;
-    $("rowWorst").hidden = erg.reaktionSchlechtest == null;
-    $("resBest").textContent = erg.reaktionBest != null ? erg.reaktionBest + " ms" : "–";
-    $("resWorst").textContent = erg.reaktionSchlechtest != null ? erg.reaktionSchlechtest + " ms" : "–";
-    $("rowSpm").hidden = erg.spm == null;
-    $("resSpm").textContent = erg.spm != null ? String(erg.spm) : "–";
-    $("resName").value = Store.name();
-    $("btnSave").disabled = false;
-    $("btnSave").textContent = t("result.save");
-    if (erg.reaktionMittel != null) Store.verlaufEintragen(erg.reaktionMittel);
+  function zeigeErgebnis() {
+    var s = GAME.getState();
+    if (!s) { return; }
+    var e = GAME.beenden();
+    var lv = s.level;
+    var name = t("mode_" + s.modus) + " " + t("level_x", { n: lv.level });
+    STORAGE.saveScore(s.modus, lv.level, {
+      name: name, punkte: e.punkte, quote: e.quote, besteSerie: e.besteSerie,
+      avgReaction: e.avgReaction, datum: new Date().toISOString()
+    });
+    STORAGE.addHistory({ datum: new Date().toISOString(), avgReaction: e.avgReaction, modus: s.modus, level: lv.level });
+    var liste = $("result-list");
+    liste.innerHTML = "";
+    function zeile(label, wert) {
+      var dt = document.createElement("dt"); dt.textContent = label;
+      var dd = document.createElement("dd"); dd.textContent = wert;
+      liste.appendChild(dt); liste.appendChild(dd);
+    }
+    zeile(t("result_score"), e.punkte);
+    zeile(t("result_accuracy"), e.quote + " " + t("unit_percent") + " (" + t("hits_of", { a: e.treffer, b: e.ziele }) + ")");
+    zeile(t("result_best_streak"), e.besteSerie);
+    if (e.avgReaction > 0) {
+      zeile(t("result_avg_reaction"), e.avgReaction + " " + t("unit_ms"));
+      zeile(t("result_min_reaction"), e.minReaction + " " + t("unit_ms"));
+      zeile(t("result_max_reaction"), e.maxReaction + " " + t("unit_ms"));
+    }
+    if (s.modus === "ausdauer") {
+      zeile(t("result_punches"), e.schlaege);
+      zeile(t("result_ppm"), e.ppm);
+    }
     zeige("result");
   }
 
-  /* ---------- Bildschirmtakt ---------- */
-  function schleife() {
-    AudioEngine.sync();
-    AudioEngine.Clock.tick(AudioEngine.now());
-    if (aktuellerScreen === "game") {
-      Game.update(AudioEngine.now());
-      hudUndZonen(Game.zustandFuerUi(AudioEngine.now()));
-    } else if (aktuellerScreen === "pause") {
-      hudUndZonen(Game.zustandFuerUi(AudioEngine.now()));
-    }
-    requestAnimationFrame(schleife);
-  }
-
-  function hudUndZonen(z) {
-    $("hudScore").textContent = String(z.punkte);
-    $("hudHits").textContent = z.treffer + "/" + z.zieleGesamt;
-    let extra = z.bpmJetzt + " BPM";
-    if (z.restSek != null) extra = z.restSek + " s · " + z.bpmJetzt + " BPM";
-    else if (z.trialNr != null && aktuelleMap) extra = z.trialNr + "/" + aktuelleMap.ziel_anzahl;
-    $("hudExtra").textContent = extra;
-
-    for (let i = 1; i <= 6; i++) {
-      const el = zoneEls[i];
-      const offen = z.offene.filter(o => o.zone === i);
-      const ring = el.querySelector(".ring");
-      if (offen.length) {
-        const o = offen[0];
-        el.classList.add("aktiv");
-        el.classList.toggle("leuchtet", o.ringMs === 0);
-        if (o.ringMs > 0) {
-          ring.hidden = false;
-          const groesse = 34 + o.fort * (el.clientWidth * 0.85);
-          ring.style.width = groesse + "px";
-          ring.style.height = groesse + "px";
-        } else ring.hidden = true;
+  /* ---------- Eingabe ---------- */
+  alleZonen().forEach(function (z) {
+    z.addEventListener("pointerdown", function (ev) {
+      ev.preventDefault();
+      var zone = parseInt(z.getAttribute("data-zone"), 10);
+      if (currentScreen === "game") {
+        AUDIO.ensure();
+        var tAudio = AUDIO.stampToAudioTime(ev.timeStamp);
+        var r = GAME.onTap(zone, tAudio, AUDIO);
+        if (r && navigator.vibrate) {
+          navigator.vibrate(r.urteil === "miss" ? [40, 30, 40] : 25);
+        }
+      } else if (currentScreen === "calib" && calibration && calibration.aktiv) {
+        kalibrierTipp(ev);
+      } else if (currentScreen === "calib") {
+        AUDIO.ensure();
       } else {
-        el.classList.remove("aktiv", "leuchtet");
-        ring.hidden = true;
+        AUDIO.ensure();
       }
-      el.classList.toggle("stoerung", z.stoer.indexOf(i) >= 0);
-    }
+    });
+  });
 
-    const ov = $("overlayMsg");
-    if (z.zustand === "vorlaeufer") {
-      ov.hidden = false;
-      ov.textContent = t("game.ready") + " " + Math.max(1, z.countdown || 1);
-    } else if (previewFrames > 0) {
-      ov.hidden = false;
-      ov.textContent = "→ " + t("common.zone", { z: z.preview || letztePreview });
-      previewFrames--;
-    } else if (losFrames > 0) {
-      ov.hidden = false;
-      ov.textContent = t("game.tapNow");
-      losFrames--;
-    } else ov.hidden = true;
-    if (z.preview > 0) { letztePreview = z.preview; previewFrames = 20; }
-    if (letzterZustand === "vorlaeufer" && z.zustand === "laeuft") losFrames = 45;
-    letzterZustand = z.zustand;
+  /* ---------- Render-Loop (einziges Zeitrad) ---------- */
+  var letzteView = null;
+  function loop() {
+    requestAnimationFrame(loop);
+    if (currentScreen !== "game") { return; }
+    var now = AUDIO.getTime();
+    GAME.tick(now, AUDIO);
+    var v = GAME.view();
+    if (!v) { return; }
+    letzteView = v;
 
-    seqbarZeichnen(z);
-  }
-  let letztePreview = 0;
+    $("hud-score").textContent = v.punkte;
+    $("hud-hits").textContent = t("hits_of", { a: v.treffer, b: Math.max(v.ziele, v.treffer) });
+    $("hud-streak").textContent = t("series_x", { n: v.serie }) + " · " + t("multiplier_x", { x: v.multiplikator });
 
-  function dotHtml(zone, aktiv) {
-    return "<span class='punkt z" + zone + (aktiv ? " punkt-aktiv" : "") + "'></span>";
-  }
-  function seqbarZeichnen(z) {
-    const bar = $("seqbar");
-    if (!aktuelleMap || (aktuelleMap.modus !== "rhythmus" && aktuelleMap.modus !== "kombination")) { bar.innerHTML = ""; return; }
-    if (aktuelleMap.modus === "kombination") {
-      const lauft = z.kombiDurchlauf < (aktuelleMap.durchlaeufe || 3);
-      const dots = aktuelleMap.sequenz.map((zn, i) => dotHtml(zn, lauft && i === z.kombiPos)).join("");
-      bar.innerHTML = "<span class='seqinfo'>" + Math.min(aktuelleMap.durchlaeufe || 3, z.kombiDurchlauf + 1) + "/" + (aktuelleMap.durchlaeufe || 3) + "</span>" + dots;
+    var s = GAME.getState();
+    var rest = s && s.endeZeit ? Math.max(0, Math.ceil(s.endeZeit - now)) : null;
+    var zeitEl = $("hud-time");
+    if (s && s.modus === "ausdauer" && rest !== null) {
+      zeitEl.classList.remove("hidden");
+      zeitEl.textContent = t("time_left", { s: rest });
     } else {
-      const kommend = z.offene.slice().sort((a, b) => a.restMs - b.restMs).slice(0, 8);
-      bar.innerHTML = kommend.map(o => dotHtml(o.zone, o.restMs < 400)).join("");
+      zeitEl.classList.add("hidden");
     }
-  }
 
-  /* ---------- Bestenliste ---------- */
-  function hsRendern() {
-    const tabs = $("hsModeTabs"); tabs.innerHTML = "";
-    for (const m of MODI_LISTE) {
-      const b = document.createElement("button");
-      b.className = "tab" + (m === hsModus ? " tab-aktiv" : "");
-      b.textContent = t("modes." + m);
-      b.addEventListener("click", () => { hsModus = m; hsLevel = 1; hsRendern(); });
-      tabs.appendChild(b);
-    }
-    const lv = $("hsLevelTabs"); lv.innerHTML = "";
-    for (let l = 1; l <= 10; l++) {
-      const b = document.createElement("button");
-      b.className = "tab" + (l === hsLevel ? " tab-aktiv" : "");
-      b.textContent = String(l);
-      b.addEventListener("click", () => { hsLevel = l; hsRendern(); });
-      lv.appendChild(b);
-    }
-    const liste = Store.punkte(hsModus, hsLevel);
-    const box = $("hsTable");
-    if (!liste.length) { box.innerHTML = "<p class='leerzeile'>" + esc(t("hs.empty")) + "</p>"; return; }
-    let html = "<table><thead><tr><th>" + esc(t("hs.rank")) + "</th><th>" + esc(t("hs.name")) +
-      "</th><th>" + esc(t("hs.points")) + "</th><th>" + esc(t("hs.acc")) + "</th><th>" + esc(t("hs.streak")) +
-      "</th><th>" + esc(t("hs.reaction")) + "</th><th>" + esc(t("hs.date")) + "</th></tr></thead><tbody>";
-    liste.forEach((eintrag, i) => {
-      html += "<tr><td>" + (i + 1) + "</td><td>" + esc(eintrag.name) + "</td><td>" + eintrag.punkte +
-        "</td><td>" + eintrag.quote + "%</td><td>" + eintrag.serie + "</td><td>" +
-        (eintrag.reaktion ? eintrag.reaktion + " ms" : "–") + "</td><td>" + eintrag.datum + "</td></tr>";
+    /* Zonen */
+    alleZonen().forEach(function (z) {
+      var n = parseInt(z.getAttribute("data-zone"), 10);
+      var ring = z.querySelector(".ring");
+      z.classList.remove("lit", "distractor", "ringing");
+      ring.classList.remove("active");
+      var status = v.zonenAn[n];
+      if (status === "hell") { z.classList.add("lit"); }
+      else if (status === "stoer") { z.classList.add("distractor"); }
+      else if (status === "ring") { z.classList.add("ringing"); }
+      if (v.ring && v.ring.zone === n) {
+        ring.classList.add("active");
+        var skala = 2.4 - 1.4 * Math.min(1, Math.max(0, v.ring.progress));
+        ring.style.transform = "scale(" + skala.toFixed(3) + ")";
+      }
     });
-    box.innerHTML = html + "</tbody></table>";
-  }
 
-  /* ---------- Verlauf (Inline-SVG) ---------- */
-  function verlaufRendern() {
-    const tage = Store.verlauf30();
-    const box = $("historyChart");
-    $("histInfo").textContent = tage.length ? "" : t("hist.empty");
-    if (!tage.length) { box.innerHTML = ""; return; }
-    const w = 320, h = 160, padL = 36, padR = 10, padO = 12, padU = 24;
-    const werte = tage.map(x => x.mittel);
-    let min = Math.min.apply(null, werte), max = Math.max.apply(null, werte);
-    if (max - min < 60) { const m = (max + min) / 2; min = m - 30; max = m + 30; }
-    const xAt = i => padL + (tage.length === 1 ? 0 : i * (w - padL - padR) / (tage.length - 1));
-    const yAt = v => h - padU - (v - min) / (max - min) * (h - padO - padU);
-    let punkte = "";
-    tage.forEach((tag, i) => {
-      punkte += "<circle cx='" + xAt(i).toFixed(1) + "' cy='" + yAt(tag.mittel).toFixed(1) + "' r='2.5' class='diag-punkt'/>";
-    });
-    const poly = tage.map((tag, i) => xAt(i).toFixed(1) + "," + yAt(tag.mittel).toFixed(1)).join(" ");
-    box.innerHTML =
-      "<svg viewBox='0 0 " + w + " " + h + "' class='diagramm-svg' role='img'>" +
-      "<line x1='" + padL + "' y1='" + (h - padU) + "' x2='" + (w - padR) + "' y2='" + (h - padU) + "' class='diag-achse'/>" +
-      "<polyline points='" + poly + "' class='diag-linie'/>" + punkte +
-      "<text x='" + padL + "' y='" + (padO + 4) + "' class='diag-text'>" + Math.round(max) + " ms</text>" +
-      "<text x='" + padL + "' y='" + (h - padU - 4) + "' class='diag-text'>" + Math.round(min) + " ms</text>" +
-      "<text x='" + padL + "' y='" + (h - 6) + "' class='diag-text'>" + esc(tage[0].datum) + "</text>" +
-      "<text x='" + (w - padR) + "' y='" + (h - 6) + "' text-anchor='end' class='diag-text'>" + esc(tage[tage.length - 1].datum) + "</text>" +
-      "</svg>";
-  }
-
-  /* ---------- Hilfe ---------- */
-  function hilfeRendern() {
-    const teile = [];
-    teile.push("<p>" + esc(t("help.intro")) + "</p>");
-    teile.push("<h3>" + esc(t("help.zonesTitle")) + "</h3><ul>");
-    ["one", "two", "three", "four", "five", "six"].forEach((n, i) => {
-      teile.push("<li>" + (i + 1) + " · " + esc(t("zones." + n)) + "</li>");
-    });
-    teile.push("</ul>");
-    teile.push("<h3>" + esc(t("help.modesTitle")) + "</h3>");
-    for (const m of MODI_LISTE) {
-      teile.push("<p><b>" + esc(t("modes." + m)) + ":</b> " + esc(t("help." + m)) + "</p>");
+    /* Feedback */
+    var fb = $("feedback");
+    if (v.feedback) {
+      fb.textContent = t(v.feedback.schluessel);
+      fb.className = v.feedback.schluessel.replace("verdict_", "");
+      if (!v.feedback.bis) { v.feedback.bis = now + 0.6; }
+    } else {
+      fb.textContent = "";
+      fb.className = "";
     }
-    teile.push("<h3>" + esc(t("help.scoringTitle")) + "</h3><p>" + esc(t("help.scoring")) + "</p>");
-    teile.push("<h3>" + esc(t("help.calibTitle")) + "</h3><p>" + esc(t("help.calib")) + "</p>");
-    teile.push("<p>" + esc(t("help.calibHint")) + "</p>");
-    teile.push("<p class='leerzeile'>" + esc(t("help.privacy")) + "</p>");
-    $("helpContent").innerHTML = teile.join("");
+
+    /* Meldungen */
+    var msg = $("big-message");
+    if (v.meldung) {
+      msg.classList.remove("hidden");
+      msg.textContent = t(v.meldung);
+    } else {
+      msg.classList.add("hidden");
+    }
+
+    /* Kombinationsleiste */
+    var strip = $("combo-strip");
+    if (v.folge && s && s.modus === "kombination") {
+      strip.classList.remove("hidden");
+      var seq = $("combo-seq");
+      seq.innerHTML = "";
+      v.folge.forEach(function (zz, i) {
+        var sp = document.createElement("span");
+        sp.textContent = zz;
+        if (i < v.seqPos) { sp.className = "done"; }
+        seq.appendChild(sp);
+      });
+    } else {
+      strip.classList.add("hidden");
+    }
+
+    if (v.beendet) { zeigeErgebnis(); }
   }
 
   /* ---------- Kalibrierung ---------- */
-  function kalibStart() {
-    audioBereit();
-    Kalib.aktiv = true; Kalib.taps = []; Kalib.letzterBeat = -999;
-    AudioEngine.Clock.setzen(90, AudioEngine.now() + 0.6, 0, true, false, 0);
-    $("calTapArea").classList.remove("versteckt");
-    $("calResult").textContent = "";
-    $("calStatus").textContent = t("cal.tapping", { n: 0 });
-    $("btnCalAgain").classList.add("versteckt");
-  }
-  function kalibAuswerten() {
-    Kalib.aktiv = false;
-    AudioEngine.Clock.stoppen();
-    const s = Kalib.taps.slice().sort((a, b) => a - b);
-    const median = Math.round((s[3] + s[4]) / 2);
-    Store.kalibrierungSetzen(median);
-    $("calResult").textContent = t("cal.result", { ms: median }) + " " + (median >= 0 ? t("cal.positive") : t("cal.negative"));
-    $("calTapArea").classList.add("versteckt");
-    $("btnCalAgain").classList.remove("versteckt");
-    kalibrierungAnzeigen();
+  var CALIB_BEATS = 8;
+  var CALIB_INTERVALL_MS = 600;
+  function starteKalibrierung() {
+    AUDIO.ensure();
+    calibration = { soll: [], ist: [], aktiv: true, naechste: 0, index: 0 };
+    var start = AUDIO.getTime() + 1.0;
+    for (var i = 0; i < CALIB_BEATS; i++) {
+      var zeit = start + i * (CALIB_INTERVALL_MS / 1000);
+      calibration.soll.push(zeit);
+      AUDIO.tickAt(zeit);
+    }
+    calibration.ende = start + CALIB_BEATS * (CALIB_INTERVALL_MS / 1000) + 1.0;
+    $("calib-feedback").classList.remove("hidden");
+    $("calib-feedback").textContent = t("calib_tap_now");
   }
 
-  /* ---------- Ereignisse ---------- */
-  function verdrahte() {
-    $("btnLangDE").addEventListener("click", () => { sprache = "de"; Store.spracheSetzen("de"); texteAnwenden(); });
-    $("btnLangEN").addEventListener("click", () => { sprache = "en"; Store.spracheSetzen("en"); texteAnwenden(); });
-    $("btnBack").addEventListener("click", () => {
-      if (aktuellerScreen === "game") { Game.pause(); zeige("pause"); return; }
-      Game.abbrechen(); zeige("menu");
-    });
-    $("btnStart").addEventListener("click", () => zeige("modes"));
-    $("btnHighscores").addEventListener("click", () => { hsRendern(); zeige("highscores"); });
-    $("btnHistory").addEventListener("click", () => { verlaufRendern(); zeige("history"); });
-    $("btnCalibrate").addEventListener("click", () => {
-      $("calTapArea").classList.add("versteckt");
-      $("calResult").textContent = "";
-      $("btnCalAgain").classList.add("versteckt");
-      zeige("calibrate");
-    });
-    $("btnHelp").addEventListener("click", () => { hilfeRendern(); zeige("help"); });
+  function kalibrierTipp(ev) {
+    if (!calibration || !calibration.aktiv) { return; }
+    var tAudio = AUDIO.stampToAudioTime(ev.timeStamp);
+    var idx = calibration.index;
+    if (idx >= calibration.soll.length) { return; }
+    /* naechster noch nicht getippter Beat */
+    while (idx < calibration.soll.length && calibration.ist[idx] !== undefined) { idx++; }
+    if (idx >= calibration.soll.length) { return; }
+    var abw = (tAudio - calibration.soll[idx]) * 1000;
+    if (Math.abs(abw) > CALIB_INTERVALL_MS / 2) { return; } /* offensichtlich daneben */
+    calibration.ist[idx] = abw;
+    calibration.index = idx + 1;
+    if (calibration.ist.filter(function (x) { return x !== undefined; }).length >= CALIB_BEATS) {
+      var werte = calibration.ist.slice().sort(function (a, b) { return a - b; });
+      var median = werte[Math.floor(werte.length / 2)];
+      STORAGE.setCalibration(Math.round(median));
+      calibration.aktiv = false;
+      $("calib-feedback").textContent = t("calib_done") + " " + t("calib_offset", { v: Math.round(median) });
+      aktualisiereCalibStatus();
+    }
+  }
 
-    $("btnPause").addEventListener("click", () => { Game.pause(); zeige("pause"); });
-    $("btnResume").addEventListener("click", () => { audioBereit(); Game.weiter(); zeige("game"); });
-    $("btnQuit").addEventListener("click", () => { Game.abbrechen(); zeige("menu"); });
-
-    $("zoneGrid").addEventListener("pointerdown", e => {
-      const zoneEl = e.target.closest(".zone");
-      if (!zoneEl) return;
-      e.preventDefault();
-      Game.zoneAngetippt(parseInt(zoneEl.getAttribute("data-zone"), 10), e);
-    });
-
-    $("btnSave").addEventListener("click", () => {
-      if (!letztesErgebnis) return;
-      const n = $("resName").value.trim();
-      Store.nameSetzen(n);
-      Store.punktEintragen(letztesErgebnis.modus, letztesErgebnis.level, {
-        name: n || "Player", punkte: letztesErgebnis.punkte, quote: letztesErgebnis.quote,
-        serie: letztesErgebnis.serie, reaktion: letztesErgebnis.reaktionMittel || 0
-      });
-      $("btnSave").disabled = true;
-      $("btnSave").textContent = t("result.saved");
-    });
-    $("btnAgain").addEventListener("click", () => {
-      if (!letztesErgebnis) return;
-      const karte = Levels.BEATMAPS.find(x => x.modus === letztesErgebnis.modus && x.level === letztesErgebnis.level);
-      if (karte) levelStarten(karte);
-    });
-    $("btnResMenu").addEventListener("click", () => zeige("menu"));
-
-    $("btnCalStart").addEventListener("click", kalibStart);
-    $("btnCalAgain").addEventListener("click", kalibStart);
-    $("btnCalReset").addEventListener("click", () => {
-      Store.kalibrierungSetzen(null);
-      $("calResult").textContent = t("menu.calibNone");
-      kalibrierungAnzeigen();
-    });
-    $("calTapArea").addEventListener("pointerdown", e => {
-      if (!Kalib.aktiv) return;
-      e.preventDefault();
-      const nowA = AudioEngine.now();
-      const k = Math.round(AudioEngine.Clock.beatJetzt(nowA));
-      if (k < 1 || k === Kalib.letzterBeat) return;
-      Kalib.letzterBeat = k;
-      Kalib.taps.push((nowA - AudioEngine.Clock.beatZeit(k)) * 1000);
-      $("calStatus").textContent = t("cal.tapping", { n: Kalib.taps.length });
-      if (Kalib.taps.length >= 8) kalibAuswerten();
-    });
-
-    /* Vordergrund/Hintergrund: Audio-Kontext schliessen und vollstaendig neu bauen. */
-    document.addEventListener("visibilitychange", () => {
-      if (document.visibilityState === "hidden") {
-        if (aktuellerScreen === "game") { Game.pause(); zeige("pause"); }
-        if (Kalib.aktiv) { Kalib.aktiv = false; AudioEngine.Clock.stoppen(); $("calTapArea").classList.add("versteckt"); }
+  function kalibrierLoop() {
+    if (calibration && calibration.aktiv && AUDIO.getTime() > calibration.ende) {
+      var anzahl = calibration.ist.filter(function (x) { return x !== undefined; }).length;
+      if (anzahl < 4) {
+        $("calib-feedback").textContent = t("calib_again");
       } else {
-        AudioEngine.neuAufbauen().then(() => { AudioEngine.sync(); Game.audioNeu(); });
+        var werte = calibration.ist.filter(function (x) { return x !== undefined; }).sort(function (a, b) { return a - b; });
+        var median = werte[Math.floor(werte.length / 2)];
+        STORAGE.setCalibration(Math.round(median));
+        $("calib-feedback").textContent = t("calib_done") + " " + t("calib_offset", { v: Math.round(median) });
+        aktualisiereCalibStatus();
       }
-    });
+      calibration.aktiv = false;
+    }
+    requestAnimationFrame(kalibrierLoop);
   }
 
-  /* ---------- Start ---------- */
-  for (let i = 1; i <= 6; i++) zoneEls[i] = document.querySelector(".zone[data-zone='" + i + "']");
-  verdrahte();
-  texteAnwenden();
+  function aktualisiereCalibStatus() {
+    var v = STORAGE.getCalibration();
+    $("calib-value").textContent = v !== 0 ? t("calib_offset", { v: v }) : t("calib_none");
+    $("calib-status").textContent = $("calib-value").textContent;
+  }
+
+  /* ---------- Verlauf (Inline-SVG) ---------- */
+  function zeichneVerlauf() {
+    var box = $("history-chart");
+    var serie = STORAGE.getHistorySeries();
+    if (!serie.some(function (d) { return d.wert !== null; })) {
+      box.innerHTML = '<p class="hint">' + t("history_empty") + "</p>";
+      return;
+    }
+    var werte = serie.map(function (d) { return d.wert; });
+    var min = Math.min.apply(null, werte.filter(function (w) { return w !== null; }));
+    var max = Math.max.apply(null, werte.filter(function (w) { return w !== null; }));
+    if (min === max) { min -= 10; max += 10; }
+    var W = 340, H = 160, PAD = 26;
+    function x(i) { return PAD + i * (W - 2 * PAD) / (serie.length - 1); }
+    function y(w) { return H - PAD - (w - min) * (H - 2 * PAD) / (max - min); }
+    var punkte = [];
+    serie.forEach(function (d, i) { if (d.wert !== null) { punkte.push(x(i).toFixed(1) + "," + y(d.wert).toFixed(1)); } });
+    var svg = '<svg viewBox="0 0 ' + W + " " + H + '" xmlns="http://www.w3.org/2000/svg" role="img">';
+    svg += '<line x1="' + PAD + '" y1="' + (H - PAD) + '" x2="' + (W - PAD) + '" y2="' + (H - PAD) + '" stroke="#2a3a52"/>';
+    svg += '<line x1="' + PAD + '" y1="' + PAD + '" x2="' + PAD + '" y2="' + (H - PAD) + '" stroke="#2a3a52"/>';
+    svg += '<text x="4" y="' + (PAD + 4) + '" fill="#7c8aa0" font-size="9">' + max + '</text>';
+    svg += '<text x="4" y="' + (H - PAD) + '" fill="#7c8aa0" font-size="9">' + min + '</text>';
+    if (punkte.length > 1) {
+      svg += '<polyline fill="none" stroke="#ffd166" stroke-width="2" points="' + punkte.join(" ") + '"/>';
+    }
+    serie.forEach(function (d, i) {
+      if (d.wert !== null) { svg += '<circle cx="' + x(i).toFixed(1) + '" cy="' + y(d.wert).toFixed(1) + '" r="2.5" fill="#ffd166"/>'; }
+    });
+    svg += '<text x="' + PAD + '" y="' + (H - 6) + '" fill="#7c8aa0" font-size="9">' + serie[0].label + '</text>';
+    svg += '<text x="' + (W - PAD - 34) + '" y="' + (H - 6) + '" fill="#7c8aa0" font-size="9">' + serie[serie.length - 1].label + '</text>';
+    svg += "</svg>";
+    box.innerHTML = svg;
+  }
+
+  /* ---------- Hilfe ---------- */
+  function zeigeHilfe() {
+    $("help-text").textContent = t("help_text");
+    zeige("help");
+  }
+
+  /* ---------- Wiedereintritt in den Vordergrund ---------- */
+  document.addEventListener("visibilitychange", function () {
+    if (!document.hidden) {
+      AUDIO.rebuild(); /* vollstaendiger Neuaufbau, sonst bleibt der Ton in WKWebView stumm */
+    }
+  });
+  window.addEventListener("pageshow", function () { AUDIO.rebuild(); });
+
+  /* ---------- Verdrahtung ---------- */
+  $("btn-back").addEventListener("pointerdown", function (ev) {
+    ev.preventDefault();
+    if (currentScreen === "game") { GAME.beenden(); }
+    zeige("menu");
+  });
+  $("btn-lang").addEventListener("pointerdown", function (ev) {
+    ev.preventDefault();
+    lang = lang === "de" ? "en" : "de";
+    STORAGE.setLanguage(lang);
+    setzeTexte();
+  });
+  $("btn-open-help").addEventListener("pointerdown", function (ev) { ev.preventDefault(); zeigeHilfe(); });
+  $("btn-open-history").addEventListener("pointerdown", function (ev) { ev.preventDefault(); zeige("history"); });
+  $("btn-open-calib").addEventListener("pointerdown", function (ev) { ev.preventDefault(); zeige("calib"); });
+  $("btn-calib-start").addEventListener("pointerdown", function (ev) { ev.preventDefault(); starteKalibrierung(); });
+  $("btn-again").addEventListener("pointerdown", function (ev) {
+    ev.preventDefault();
+    if (laufendesLevel) { starteSpiel(laufendesLevel.modus, laufendesLevel.lvl); }
+  });
+  $("btn-tomenu").addEventListener("pointerdown", function (ev) { ev.preventDefault(); zeige("menu"); });
+
+  /* Start */
+  setzeTexte();
+  aktualisiereCalibStatus();
   zeige("menu");
-  requestAnimationFrame(schleife);
+  requestAnimationFrame(loop);
+  requestAnimationFrame(kalibrierLoop);
 })();

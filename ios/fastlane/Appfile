@@ -1,0 +1,4 @@
+# https://docs.fastlane.tools/advanced/#appfile
+app_identifier("de.beatbox.game")
+apple_id("DEINE_APPLE_ID")
+itc_team_id("DEIN_ITC_TEAM_ID")

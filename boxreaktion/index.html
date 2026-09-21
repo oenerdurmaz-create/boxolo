@@ -3,132 +3,97 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, user-scalable=no">
-<meta name="apple-mobile-web-app-capable" content="yes">
-<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="theme-color" content="#0b0e14">
 <title>BeatBox</title>
 <link rel="stylesheet" href="css/style.css">
 </head>
 <body>
-<header class="topbar">
-  <button id="btnBack" class="iconknopf versteckt">‹</button>
-  <h1>BeatBox</h1>
-  <div class="sprachwahl">
-    <button id="btnLangDE" class="sprachknopf">DE</button>
-    <button id="btnLangEN" class="sprachknopf">EN</button>
-  </div>
+<header id="topbar">
+  <button id="btn-back" class="navbtn hidden" data-i18n="btn_back">Zurück</button>
+  <h1 id="app-title">BeatBox</h1>
+  <button id="btn-lang" class="navbtn" aria-label="Language">EN</button>
 </header>
 
-<main id="app">
+<main id="screens">
 
   <section id="screen-menu" class="screen">
-    <p class="untertitel" data-i18n="app.subtitle"></p>
-    <p id="calibInfo" class="kalibzeile"></p>
-    <div class="menuliste">
-      <button id="btnStart" class="grossknopf" data-i18n="menu.start"></button>
-      <button id="btnHighscores" class="grossknopf" data-i18n="menu.highscores"></button>
-      <button id="btnHistory" class="grossknopf" data-i18n="menu.history"></button>
-      <button id="btnCalibrate" class="grossknopf" data-i18n="menu.calibrate"></button>
-      <button id="btnHelp" class="grossknopf" data-i18n="menu.help"></button>
+    <p id="menu-sub" class="sub" data-i18n="app_sub"></p>
+    <h2 data-i18n="menu_choose_mode"></h2>
+    <div id="mode-list"></div>
+    <div class="menu-footer">
+      <button class="menubtn" id="btn-open-help" data-i18n="btn_help"></button>
+      <button class="menubtn" id="btn-open-history" data-i18n="btn_history"></button>
+      <button class="menubtn" id="btn-open-calib" data-i18n="btn_calibration"></button>
+    </div>
+    <p id="calib-status" class="hint"></p>
+  </section>
+
+  <section id="screen-levels" class="screen hidden">
+    <h2 id="levels-mode-title"></h2>
+    <p id="levels-desc" class="sub"></p>
+    <div id="level-grid"></div>
+    <p class="hint" data-i18n="all_unlocked"></p>
+    <p id="best-score" class="hint"></p>
+  </section>
+
+  <section id="screen-game" class="screen hidden">
+    <div id="hud">
+      <span id="hud-score">0</span>
+      <span id="hud-hits"></span>
+      <span id="hud-streak"></span>
+      <span id="hud-time" class="hidden"></span>
+    </div>
+    <div id="combo-strip" class="hidden">
+      <span data-i18n="seq_label"></span>
+      <span id="combo-seq"></span>
+    </div>
+    <p id="distractor-note" class="hint hidden" data-i18n="distractor_warning"></p>
+    <div id="zones">
+      <button class="zone" data-zone="1"><span class="ring"></span><span class="zlabel"></span></button>
+      <button class="zone" data-zone="2"><span class="ring"></span><span class="zlabel"></span></button>
+      <button class="zone" data-zone="3"><span class="ring"></span><span class="zlabel"></span></button>
+      <button class="zone" data-zone="4"><span class="ring"></span><span class="zlabel"></span></button>
+      <button class="zone" data-zone="5"><span class="ring"></span><span class="zlabel"></span></button>
+      <button class="zone" data-zone="6"><span class="ring"></span><span class="zlabel"></span></button>
+    </div>
+    <div id="feedback"></div>
+    <div id="big-message" class="hidden"></div>
+  </section>
+
+  <section id="screen-result" class="screen hidden">
+    <h2 data-i18n="result_title"></h2>
+    <dl id="result-list"></dl>
+    <div class="row">
+      <button class="menubtn" id="btn-again" data-i18n="btn_again"></button>
+      <button class="menubtn" id="btn-tomenu" data-i18n="btn_menu"></button>
     </div>
   </section>
 
-  <section id="screen-modes" class="screen versteckt">
-    <h2 data-i18n="modes.title"></h2>
-    <div id="modeList" class="modusliste"></div>
+  <section id="screen-help" class="screen hidden">
+    <h2 data-i18n="help_title"></h2>
+    <pre id="help-text"></pre>
   </section>
 
-  <section id="screen-levels" class="screen versteckt">
-    <h2 id="levelsTitle"></h2>
-    <div id="levelList" class="levelliste"></div>
+  <section id="screen-history" class="screen hidden">
+    <h2 data-i18n="history_title"></h2>
+    <p class="sub" data-i18n="history_info"></p>
+    <div id="history-chart"></div>
   </section>
 
-  <section id="screen-game" class="screen spiel versteckt">
-    <div class="hud">
-      <span class="hud-punkte" id="hudScore">0</span>
-      <span class="hud-mitte" id="hudHits">0/0</span>
-      <span class="hud-extra" id="hudExtra"></span>
-      <button id="btnPause" class="iconknopf" data-i18n="hud.pause"></button>
-    </div>
-    <div id="seqbar" class="sequenzleiste"></div>
-    <div id="zoneGrid" class="zonenraster">
-      <div class="zone zone1" data-zone="1"><span class="znummer">1</span><span class="zname">JAB·L</span><div class="ring" hidden></div></div>
-      <div class="zone zone2" data-zone="2"><span class="znummer">2</span><span class="zname">CROSS·R</span><div class="ring" hidden></div></div>
-      <div class="zone zone3" data-zone="3"><span class="znummer">3</span><span class="zname">HOOK·L</span><div class="ring" hidden></div></div>
-      <div class="zone zone4" data-zone="4"><span class="znummer">4</span><span class="zname">HOOK·R</span><div class="ring" hidden></div></div>
-      <div class="zone zone5" data-zone="5"><span class="znummer">5</span><span class="zname">UPP·L</span><div class="ring" hidden></div></div>
-      <div class="zone zone6" data-zone="6"><span class="znummer">6</span><span class="zname">UPP·R</span><div class="ring" hidden></div></div>
-    </div>
-    <div id="overlayMsg" class="ueberlagerung versteckt"></div>
-  </section>
-
-  <section id="screen-pause" class="screen versteckt">
-    <h2 data-i18n="game.paused"></h2>
-    <div class="menuliste">
-      <button id="btnResume" class="grossknopf" data-i18n="game.resume"></button>
-      <button id="btnQuit" class="grossknopf sekundaer" data-i18n="game.quit"></button>
-    </div>
-  </section>
-
-  <section id="screen-result" class="screen versteckt">
-    <h2 data-i18n="result.title"></h2>
-    <p id="resMode" class="infozeile"></p>
-    <div class="statkasten">
-      <div class="stat gross"><span data-i18n="result.score"></span><b id="resScore">0</b></div>
-      <div class="stat"><span data-i18n="result.accuracy"></span><b id="resQuote">0%</b></div>
-      <div class="stat"><span data-i18n="hud.hits"></span><b id="resHits">0/0</b></div>
-      <div class="stat"><span data-i18n="result.streak"></span><b id="resStreak">0</b></div>
-      <div class="stat"><span data-i18n="result.avgReaction"></span><b id="resReaction">–</b></div>
-      <div class="stat" id="rowBest" hidden><span data-i18n="result.best"></span><b id="resBest">–</b></div>
-      <div class="stat" id="rowWorst" hidden><span data-i18n="result.worst"></span><b id="resWorst">–</b></div>
-      <div class="stat" id="rowSpm" hidden><span data-i18n="result.spm"></span><b id="resSpm">–</b></div>
-    </div>
-    <label class="namenfeld"><span data-i18n="result.name"></span>
-      <input id="resName" maxlength="20" autocomplete="off">
-    </label>
-    <div class="knopfreihe">
-      <button id="btnSave" class="grossknopf" data-i18n="result.save"></button>
-      <button id="btnAgain" class="grossknopf sekundaer" data-i18n="result.again"></button>
-      <button id="btnResMenu" class="grossknopf sekundaer" data-i18n="result.menu"></button>
-    </div>
-  </section>
-
-  <section id="screen-highscores" class="screen versteckt">
-    <h2 data-i18n="hs.title"></h2>
-    <div id="hsModeTabs" class="reiter"></div>
-    <div id="hsLevelTabs" class="reiter klein"></div>
-    <div id="hsTable" class="tabelle"></div>
-  </section>
-
-  <section id="screen-history" class="screen versteckt">
-    <h2 data-i18n="hist.title"></h2>
-    <p data-i18n="hist.avg30"></p>
-    <div id="historyChart" class="diagramm"></div>
-    <p id="histInfo" class="leerzeile"></p>
-  </section>
-
-  <section id="screen-calibrate" class="screen versteckt">
-    <h2 data-i18n="cal.title"></h2>
-    <p data-i18n="cal.intro"></p>
-    <p class="warnung" data-i18n="cal.btWarning"></p>
-    <button id="btnCalStart" class="grossknopf" data-i18n="cal.start"></button>
-    <div id="calTapArea" class="tapflaeche versteckt"><p id="calStatus"></p></div>
-    <p id="calResult" class="ergebniszeile"></p>
-    <div class="knopfreihe">
-      <button id="btnCalAgain" class="grossknopf sekundaer versteckt" data-i18n="cal.again"></button>
-      <button id="btnCalReset" class="grossknopf sekundaer" data-i18n="cal.reset"></button>
-    </div>
-  </section>
-
-  <section id="screen-help" class="screen scrollbar versteckt">
-    <h2 data-i18n="help.title"></h2>
-    <div id="helpContent" class="hilfetext"></div>
+  <section id="screen-calib" class="screen hidden">
+    <h2 data-i18n="calib_title"></h2>
+    <p class="sub" data-i18n="calib_intro"></p>
+    <p class="hint" data-i18n="calib_hint_bt"></p>
+    <p id="calib-value" class="highlight"></p>
+    <button class="menubtn" id="btn-calib-start" data-i18n="calib_start"></button>
+    <div id="calib-feedback" class="hidden"></div>
   </section>
 
 </main>
 
 <script src="js/i18n.js"></script>
-<script src="js/levels.js"></script>
 <script src="js/storage.js"></script>
+<script src="js/levels.js"></script>
 <script src="js/audio.js"></script>
 <script src="js/game.js"></script>
 <script src="js/main.js"></script>

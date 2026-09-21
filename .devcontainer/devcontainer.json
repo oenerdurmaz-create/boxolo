@@ -1,0 +1,17 @@
+{
+  "name": "BeatBox Web-Entwicklung",
+  "image": "mcr.microsoft.com/devcontainers/javascript-node:20",
+  "features": {
+    "ghcr.io/devcontainers/features/github-cli:1": {}
+  },
+  "customizations": {
+    "vscode": {
+      "extensions": ["dbaeumer.vscode-eslint", "esbenp.prettier-vscode"]
+    }
+  },
+  "postCreateCommand": "node boxreaktion/tools/pruefung.js && echo 'Testserver: cd boxreaktion && python3 -m http.server 8000'",
+  "forwardPorts": [8000],
+  "portsAttributes": {
+    "8000": { "label": "BeatBox Testserver", "onAutoForward": "notify" }
+  }
+}

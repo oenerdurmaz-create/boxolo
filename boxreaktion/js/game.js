@@ -1,402 +1,469 @@
-"use strict";
-/* BeatBox - Spiellogik, Bewertung, fuenf Modi.
-   Zeitregel: Der einzige Zeitgeber ist die Audio-Uhr (AudioEngine.now und
-   event.timeStamp, abgebildet ueber AudioEngine.zeigereignisZuAudio). Alle
-   Rundenzeiten sind relative Werte zu zeitBasis, damit Pause und der
-   Neuaufbau des Audio-Kontexts sauber funktionieren. Angetrieben wird die
-   Logik ausschliesslich aus dem Bildschirmtakt-Ruf in main.js. */
+/* BeatBox — Spiellogik, Bewertung, Modi.
+   Taktgeber ist ausschliesslich die per tick(now) uebergebene Audio-Zeit.
+   Eingabe-Zeitpunkte kommen als umgerechneter event.timeStamp-Wert an. */
+(function (root, factory) {
+  var G = factory();
+  root.BEATBOX_GAME = G;
+  if (typeof module !== "undefined" && module.exports) { module.exports = G; }
+})(typeof self !== "undefined" ? self : this, function () {
+  "use strict";
 
-const Game = (function () {
-  const ZUSTAND = { AUS: "aus", VORLAEUFER: "vorlaeufer", LAEUFT: "laeuft", PAUSE: "pause", FERTIG: "fertig" };
-  const MULTIPLIKATOR = [1, 1.5, 2, 3, 4];
-  const URTEILSFENSTER = [
-    { bis: 40, key: "perfect", punkte: 100 },
-    { bis: 80, key: "good", punkte: 60 },
-    { bis: 130, key: "ok", punkte: 25 }
-  ];
+  var PUNKTE = { perfect: 100, good: 60, ok: 25, miss: 0 };
 
-  let map = null;
-  let zustand = ZUSTAND.AUS;
-  let zeitBasis = 0;      /* Audiozeit, auf die sich relMs bezieht */
-  let pausenStandMs = 0;
-  let ruck = null;        /* Rueckrufe: onJudge(zone,key,ms,richtung), onEnde(ergebnis) */
-  let daten = null;
-  let ziele = [];
-  let stoer = [];
-  let naechsteStoerAbMs = 0;
-  /* Reaktion */
-  let trialIndex = 0, trialPhase = "warten", trialZone = 0, trialZielRelMs = 0;
-  /* Ausdauer */
-  let ausdauerZiel = null, ausdauerErledigt = 0, ausdauerVerpasst = 0;
-  /* Kombination */
-  let kombiPos = 0, kombiDurchlauf = 0, kombiSatzBeats = 0, kombiVorfuehrPos = -1, kombiPreview = 0;
-
-  function beatMs() { return 60000 / map.bpm; }
-  function countinBeats() { return map.countin_beats || 4; }
-  function countinMs() { return countinBeats() * beatMs(); }
-  function levelFaktor() { return 1 + ((map.level || 1) - 1) / 10; }
-  function aktiveMult() { return MULTIPLIKATOR[Math.min(MULTIPLIKATOR.length - 1, Math.floor(daten.serie / 10))]; }
-  function livePunkte() { return Math.round(daten.punkteSumme * daten.multMax * levelFaktor()); }
-  function zufallsZone() { return map.zonen[Math.floor(Math.random() * map.zonen.length)]; }
-  function zufall(min, max) { return min + Math.random() * (max - min); }
-  function kalibMs() { const k = Store.kalibrierungMs(); return k == null ? 0 : k; }
-  function richtung(ms) { return ms < 0 ? "early" : "late"; }
-
-  function start(m, rueckrufe) {
-    const pruef = validateBeatmap(m);
-    if (!pruef.ok) throw new Error("Ungueltige Beatmap: " + pruef.fehler.join("; "));
-    map = m; ruck = rueckrufe;
-    daten = { punkteSumme: 0, treffer: 0, serie: 0, besteSerie: 0, multMax: 1,
-              messungen: [], urteile: { perfect: 0, good: 0, ok: 0, miss: 0 }, fruhStarts: 0 };
-    ziele = []; stoer = []; naechsteStoerAbMs = countinMs() + 3000;
-    trialIndex = 0; trialPhase = "warten"; trialZone = 0; trialZielRelMs = 0;
-    ausdauerZiel = null; ausdauerErledigt = 0; ausdauerVerpasst = 0;
-    kombiPos = 0; kombiDurchlauf = 0; kombiVorfuehrPos = -1; kombiPreview = 0;
-    if (map.modus === "timing") zieleTimingBauen();
-    if (map.modus === "rhythmus") zieleRhythmusBauen();
-    if (map.modus === "kombination") zieleKombinationBauen();
-    zeitBasis = AudioEngine.now();
-    pausenStandMs = 0;
-    const metronom = (map.modus === "kombination" || map.modus === "rhythmus");
-    const kulisse = (map.modus === "reaktion" || map.modus === "timing");
-    AudioEngine.Clock.setzen(map.bpm, zeitBasis, countinBeats(), metronom, kulisse, -countinBeats());
-    zustand = ZUSTAND.VORLAEUFER;
+  function beurteilen(abweichungMs, fensterMs) {
+    var a = Math.abs(abweichungMs);
+    if (a <= fensterMs * 0.31) { return "perfect"; }
+    if (a <= fensterMs * 0.62) { return "good"; }
+    if (a <= fensterMs) { return "ok"; }
+    return "miss";
   }
 
-  /* Nach Neuaufbau des Audio-Kontexts: Zeitbasis neu verankern. */
-  function audioNeu() {
-    if (zustand === ZUSTAND.PAUSE && map) {
-      zeitBasis = AudioEngine.now() - pausenStandMs / 1000;
-      const metronom = (map.modus === "kombination" || map.modus === "rhythmus");
-      const kulisse = (map.modus === "reaktion" || map.modus === "timing");
-      const beatJetzt = pausenStandMs / beatMs() - countinBeats();
-      AudioEngine.Clock.setzen(map.bpm, zeitBasis, countinBeats(), metronom, kulisse, Math.ceil(beatJetzt));
-    }
-  }
-
-  function pause() {
-    if (zustand !== ZUSTAND.LAEUFT && zustand !== ZUSTAND.VORLAEUFER) return;
-    pausenStandMs = (AudioEngine.now() - zeitBasis) * 1000;
-    zustand = ZUSTAND.PAUSE;
-  }
-  function weiter() {
-    if (zustand !== ZUSTAND.PAUSE) return;
-    const deltaSek = AudioEngine.now() - (zeitBasis + pausenStandMs / 1000);
-    if (deltaSek > 0.01) { zeitBasis += deltaSek; AudioEngine.Clock.verschieben(deltaSek); }
-    zustand = (pausenStandMs < countinMs()) ? ZUSTAND.VORLAEUFER : ZUSTAND.LAEUFT;
-  }
-  function abbrechen() { if (map) AudioEngine.Clock.stoppen(); zustand = ZUSTAND.AUS; }
-
-  /* ---------- Zielaufbau je Modus ---------- */
-
-  function zieleTimingBauen() {
-    const bm = beatMs();
-    const abstandBeats = Math.max(2, Math.ceil(map.ring_laufzeit_ms / bm));
-    ziele = [];
-    for (let i = 0; i < map.ziel_anzahl; i++) {
-      ziele.push({ zone: zufallsZone(), relMs: countinMs() + 400 + i * abstandBeats * bm,
-                   ringMs: map.ring_laufzeit_ms, status: "offen" });
-    }
-  }
-  function zieleRhythmusBauen() {
-    const bm = beatMs();
-    const ringMs = Math.min(1400, bm * 2.5);
-    ziele = [];
-    const phrasen = map.phrasen || 4, laenge = map.phrasen_beats || 8;
-    for (let p = 0; p < phrasen; p++) {
-      for (const n of map.noten) {
-        const k = p * laenge + n.beat;
-        ziele.push({ zone: n.zone, relMs: (countinBeats() + k) * bm, ringMs: ringMs, status: "offen" });
-      }
-    }
-    ziele.sort((a, b) => a.relMs - b.relMs);
-  }
-  function zieleKombinationBauen() {
-    const bm = beatMs(); const len = map.sequenz.length;
-    kombiSatzBeats = 2 * len + 1;
-    ziele = [];
-    for (let d = 0; d < (map.durchlaeufe || 3); d++) {
-      for (let i = 0; i < len; i++) {
-        const k = d * kombiSatzBeats + len + i;
-        ziele.push({ zone: map.sequenz[i], relMs: (countinBeats() + k) * bm,
-                     ringMs: Math.min(1200, bm * 2), status: "offen",
-                     kombiDurchlauf: d, kombiPos: i });
-      }
-    }
-  }
-
-  /* ---------- Frame-Schritt ---------- */
-
-  function update(nowA) {
-    if (zustand !== ZUSTAND.LAEUFT && zustand !== ZUSTAND.VORLAEUFER) return;
-    const relMs = (nowA - zeitBasis) * 1000;
-    kombiPreview = 0;
-    if (zustand === ZUSTAND.VORLAEUFER) {
-      if (relMs >= countinMs()) zustand = ZUSTAND.LAEUFT;
-      return;
-    }
-    if (map.modus === "reaktion") schrittReaktion(relMs);
-    else if (map.modus === "timing" || map.modus === "rhythmus") schrittZiele(relMs);
-    else if (map.modus === "kombination") schrittKombination(relMs);
-    else if (map.modus === "ausdauer") schrittAusdauer(relMs);
-    stoerSchritt(relMs);
-  }
-
-  function schrittReaktion(relMs) {
-    if (trialIndex >= map.ziel_anzahl) { abschliessen(); return; }
-    if (trialZielRelMs === 0) trialZielRelMs = relMs + zufall(map.warte_min_ms, map.warte_max_ms);
-    if (trialPhase === "warten" && relMs >= trialZielRelMs) {
-      trialPhase = "leuchtet"; trialZone = zufallsZone();
-      AudioEngine.spielen("hihat", null, 0.8);
-    }
-  }
-
-  function schrittZiele(relMs) {
-    for (const z of ziele) {
-      if (z.status === "offen" && relMs > z.relMs + map.trefferfenster_ms) {
-        z.status = "verpasst"; zielVerpasst(z.zone);
-      }
-    }
-    if (ziele.length > 0) {
-      let offen = false;
-      for (const z of ziele) if (z.status === "offen") { offen = true; break; }
-      if (!offen) abschliessen();
-    }
-  }
-
-  function schrittKombination(relMs) {
-    const len = map.sequenz.length;
-    const durchlaeufe = map.durchlaeufe || 3;
-    const beatJetzt = relMs / beatMs() - countinBeats();
-    if (kombiDurchlauf < durchlaeufe) {
-      const satzStart = kombiDurchlauf * kombiSatzBeats;
-      const f = Math.floor(beatJetzt);
-      if (f >= satzStart && f < satzStart + len && f > kombiVorfuehrPos) {
-        kombiVorfuehrPos = f;
-        kombiPreview = map.sequenz[f - satzStart];
-        AudioEngine.spielen("kick", null, 0.5);
-      }
-    }
-    for (const z of ziele) {
-      if (z.status !== "offen") continue;
-      if (z.kombiDurchlauf < kombiDurchlauf) { z.status = "uebersprungen"; continue; }
-      if (z.kombiDurchlauf === kombiDurchlauf && relMs > z.relMs + map.trefferfenster_ms) {
-        z.status = "verpasst"; zielVerpasst(z.zone); kombiSatzAbbrechen();
-      }
-    }
-    if (kombiDurchlauf >= durchlaeufe) {
-      for (const z of ziele) if (z.status === "offen") z.status = "uebersprungen";
-    }
-    let offen = false;
-    for (const z of ziele) if (z.status === "offen") { offen = true; break; }
-    if (!offen) abschliessen();
-  }
-  function kombiSatzAbbrechen() {
-    for (const z of ziele) if (z.status === "offen" && z.kombiDurchlauf === kombiDurchlauf) z.status = "uebersprungen";
-    kombiDurchlauf++; kombiPos = 0; kombiVorfuehrPos = -1;
-  }
-
-  function ausdauerBpm(relMs) { return map.bpm + map.bpm_schritt * Math.floor((relMs / 1000) / 10); }
-  function ausdauerIntervallMs(relMs) { return 60000 / ausdauerBpm(relMs); }
-  function schrittAusdauer(relMs) {
-    if (relMs >= map.dauer_s * 1000) { abschliessen(); return; }
-    if (!ausdauerZiel) ausdauerZiel = { zone: zufallsZone(), relMs: relMs + 300, status: "offen" };
-    if (relMs > ausdauerZiel.relMs + map.trefferfenster_ms) {
-      ausdauerZiel.status = "verpasst"; zielVerpasst(ausdauerZiel.zone); ausdauerVerpasst++;
-      ausdauerZiel = { zone: zufallsZone(), relMs: relMs + ausdauerIntervallMs(relMs), status: "offen" };
-    }
-  }
-
-  /* Stoerziele: blitzen auf und duerfen nicht getroffen werden (max 2 gleichzeitig). */
-  function stoerSchritt(relMs) {
-    if (!map.stoerziele || map.modus === "kombination") { stoer = stoer.filter(s => s.bisRelMs > relMs); return; }
-    stoer = stoer.filter(s => s.bisRelMs > relMs);
-    if (relMs >= naechsteStoerAbMs && stoer.length < map.stoerziele) {
-      const belegt = new Set(stoer.map(s => s.zone));
-      if (trialPhase === "leuchtet") belegt.add(trialZone);
-      if (ausdauerZiel && ausdauerZiel.status === "offen") belegt.add(ausdauerZiel.zone);
-      for (const z of ziele) if (z.status === "offen" && z.relMs - relMs < 2000) belegt.add(z.zone);
-      const frei = map.zonen.filter(z => !belegt.has(z));
-      if (frei.length > 0) stoer.push({ zone: frei[Math.floor(Math.random() * frei.length)], bisRelMs: relMs + 1400 });
-      naechsteStoerAbMs = relMs + zufall(2200, 5000);
-    }
-  }
-
-  /* ---------- Bewertung ---------- */
-
-  function zielBewerten(zone, abstandMs, messwertZaehlt) {
-    const a = Math.abs(abstandMs);
-    let u = null;
-    for (const x of URTEILSFENSTER) if (a <= x.bis) { u = x; break; }
-    if (!u) u = (a <= map.trefferfenster_ms) ? { key: "ok", punkte: 25 } : { key: "miss", punkte: 0 };
-    daten.urteile[u.key]++;
-    if (u.key === "miss") {
-      daten.serie = 0;
-      AudioEngine.spielen("daneben");
-      if (ruck.onJudge) ruck.onJudge(zone, "miss", abstandMs, richtung(abstandMs));
-    } else {
-      daten.punkteSumme += u.punkte;
-      daten.treffer++;
-      daten.serie++;
-      if (daten.serie > daten.besteSerie) daten.besteSerie = daten.serie;
-      const m = aktiveMult(); if (m > daten.multMax) daten.multMax = m;
-      AudioEngine.spielen("treffer", null, u.key === "perfect" ? 1 : 0.8);
-      if (messwertZaehlt) daten.messungen.push(abstandMs);
-      if (ruck.onJudge) ruck.onJudge(zone, u.key, abstandMs, richtung(abstandMs));
-    }
-  }
-  function zielVerpasst(zone) {
-    daten.urteile.miss++; daten.serie = 0;
-    AudioEngine.spielen("daneben");
-    if (ruck.onJudge) ruck.onJudge(zone, "miss", null, null);
-  }
-  function fehlUrteil(zone) {
-    daten.urteile.miss++; daten.serie = 0;
-    AudioEngine.spielen("daneben");
-    if (ruck.onJudge) ruck.onJudge(zone, "miss", null, null);
-  }
-
-  /* ---------- Eingabe ---------- */
-
-  function zoneAngetippt(zone, ereignis) {
-    if (zustand !== ZUSTAND.LAEUFT) return;
-    const tapA = AudioEngine.zeigereignisZuAudio(ereignis.timeStamp);
-    const relMs = (tapA - zeitBasis) * 1000;
-    const sIdx = stoer.findIndex(s => s.zone === zone);
-    if (sIdx >= 0) { stoer.splice(sIdx, 1); fehlUrteil(zone); return; }
-    if (map.modus === "reaktion") tipReaktion(zone, relMs);
-    else if (map.modus === "timing" || map.modus === "rhythmus") tipZiel(zone, relMs);
-    else if (map.modus === "kombination") tipKombination(zone, relMs);
-    else if (map.modus === "ausdauer") tipAusdauer(zone, relMs);
-  }
-
-  function tipReaktion(zone, relMs) {
-    if (trialPhase === "warten") {
-      /* Fruehstart: Trial wird wiederholt, nach 5 Fruehstarten endet die Runde. */
-      daten.fruhStarts++; fehlUrteil(zone);
-      if (daten.fruhStarts >= 5) { abschliessen(); return; }
-      trialZielRelMs = relMs + zufall(map.warte_min_ms, map.warte_max_ms);
-      return;
-    }
-    const abstandRoh = relMs - trialZielRelMs;
-    if (zone !== trialZone) fehlUrteil(zone);
-    else zielBewerten(trialZone, abstandRoh - kalibMs(), true);
-    trialIndex++;
-    trialPhase = "warten";
-    if (trialIndex >= map.ziel_anzahl) { abschliessen(); return; }
-    trialZielRelMs = relMs + zufall(map.warte_min_ms, map.warte_max_ms);
-  }
-
-  function tipZiel(zone, relMs) {
-    let bestes = null;
-    for (const z of ziele) {
-      if (z.status !== "offen" || z.zone !== zone) continue;
-      if (!bestes || Math.abs(z.relMs - relMs) < Math.abs(bestes.relMs - relMs)) bestes = z;
-    }
-    if (!bestes) { fehlUrteil(zone); return; }
-    bestes.status = "getroffen";
-    zielBewerten(zone, (relMs - bestes.relMs) - kalibMs(), true);
-  }
-
-  function tipKombination(zone, relMs) {
-    if (kombiDurchlauf >= (map.durchlaeufe || 3)) return;
-    const erwartet = map.sequenz[kombiPos];
-    if (!erwartet) return;
-    const ziel = ziele.find(z => z.status === "offen" && z.kombiDurchlauf === kombiDurchlauf && z.kombiPos === kombiPos);
-    if (!ziel) return;
-    if (zone !== erwartet) {
-      ziel.status = "uebersprungen";
-      fehlUrteil(zone);
-      kombiSatzAbbrechen();
-      return;
-    }
-    ziel.status = "getroffen";
-    zielBewerten(zone, (relMs - ziel.relMs) - kalibMs(), true);
-    kombiPos++;
-    if (kombiPos >= map.sequenz.length) { kombiDurchlauf++; kombiPos = 0; kombiVorfuehrPos = -1; }
-  }
-
-  function tipAusdauer(zone, relMs) {
-    if (ausdauerZiel && ausdauerZiel.status === "offen" && zone === ausdauerZiel.zone) {
-      ausdauerZiel.status = "getroffen";
-      zielBewerten(zone, (relMs - ausdauerZiel.relMs) - kalibMs(), true);
-      ausdauerErledigt++;
-      ausdauerZiel = { zone: zufallsZone(), relMs: Math.max(relMs, ausdauerZiel.relMs) + ausdauerIntervallMs(relMs), status: "offen" };
-    } else {
-      fehlUrteil(zone);
-    }
-  }
-
-  /* ---------- Abschluss ---------- */
-
-  function zieleGesamtZaehler() {
-    if (map.modus === "reaktion") return map.ziel_anzahl;
-    if (map.modus === "ausdauer") return ausdauerErledigt + ausdauerVerpasst;
-    return ziele.filter(z => z.status !== "uebersprungen").length;
-  }
-  function mittel(arr) {
-    if (!arr.length) return null;
-    let s = 0; for (const v of arr) s += Math.abs(v);
-    return Math.round(s / arr.length);
-  }
-  function abschliessen() {
-    if (zustand === ZUSTAND.FERTIG) return;
-    zustand = ZUSTAND.FERTIG;
-    AudioEngine.Clock.stoppen();
-    const gesamt = zieleGesamtZaehler();
-    const erg = {
-      modus: map.modus, level: map.level,
-      punkte: livePunkte(),
-      treffer: daten.treffer, zieleGesamt: gesamt,
-      quote: gesamt > 0 ? Math.round(100 * daten.treffer / gesamt) : 0,
-      serie: daten.besteSerie,
-      reaktionMittel: mittel(daten.messungen),
-      urteile: { perfect: daten.urteile.perfect, good: daten.urteile.good, ok: daten.urteile.ok, miss: daten.urteile.miss }
+  function mulberry32(seed) {
+    var a = seed >>> 0;
+    return function () {
+      a |= 0; a = (a + 0x6D2B79F5) | 0;
+      var t = Math.imul(a ^ (a >>> 15), 1 | a);
+      t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
+      return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
     };
-    if (map.modus === "reaktion") {
-      const werte = daten.messungen.map(Math.abs).sort((a, b) => a - b);
-      if (werte.length) { erg.reaktionBest = Math.round(werte[0]); erg.reaktionSchlechtest = Math.round(werte[werte.length - 1]); }
-    }
-    if (map.modus === "ausdauer") erg.spm = Math.round(daten.treffer); /* Runde dauert 60 s */
-    if (ruck.onEnde) ruck.onEnde(erg);
   }
 
-  /* ---------- Zustand fuer die Oberflaeche ---------- */
+  var state = null;
 
-  function zustandFuerUi(nowA) {
-    const relMs = (nowA - zeitBasis) * 1000;
-    const offene = [];
-    for (const z of ziele) {
-      if (z.status !== "offen") continue;
-      const restMs = z.relMs - relMs;
-      let fort = 0;
-      if (z.ringMs) fort = Math.max(0, Math.min(1.08, 1 - restMs / z.ringMs));
-      offene.push({ zone: z.zone, fort: fort, ringMs: z.ringMs || 0, restMs: restMs });
+  function neuerLauf(modus, levelDef, kalibrierungMs, startTime) {
+    var rng = mulberry32((levelDef.level * 7919) + modus.length * 104729);
+    var s = {
+      modus: modus,
+      level: levelDef,
+      kalib: kalibrierungMs || 0,
+      t0: startTime,
+      rng: rng,
+      fenster: levelDef.trefferfenster_ms,
+      beat: 60 / levelDef.bpm,
+      punkteSumme: 0,
+      treffer: 0,
+      ziele: 0,
+      serie: 0,
+      besteSerie: 0,
+      maxMultiplikator: 1,
+      reaktionen: [],
+      beendet: false,
+      ergebnis: null,
+      feedback: null,          /* {schluessel, zone, bis} */
+      zonenAn: {},             /* zone -> "hell" | "stoer" | "ring" */
+      ring: null,              /* {zone, progress, ziel} */
+      sequenzSichtbar: null,
+      meldung: "game_ready",
+      meldungBis: startTime + 2.2,
+      schritte: [],
+      schrittIndex: 0,
+      komboRunde: 0,
+      schlaegeGesamt: 0
+    };
+
+    function zufallsZone() { return 1 + Math.floor(s.rng() * s.level.aktiveZonen); }
+    function stoerZone(hell) {
+      var z = zufallsZone();
+      var guard = 0;
+      while (z === hell && guard++ < 10) { z = zufallsZone(); }
+      return z;
     }
-    if (map.modus === "reaktion" && trialPhase === "leuchtet") {
-      offene.push({ zone: trialZone, fort: 0, ringMs: 0, restMs: 0 });
+
+    /* --- Modus-Reaktion: 20 Schläge, zufällige Zeitpunkte --- */
+    if (modus === "reaktion") {
+      var t = startTime + 2.5;
+      for (var i = 0; i < 20; i++) {
+        var zone = zufallsZone();
+        var stoer = s.level.stoerziele > 0 && s.rng() < 0.4 ? stoerZone(zone) : 0;
+        s.schritte.push({ zeit: t, zone: zone, stoer: stoer, erledigt: false });
+        t += 0.7 + s.rng() * 1.5;
+      }
+      s.endeZeit = t + 1.0;
     }
-    if (map.modus === "ausdauer" && ausdauerZiel && ausdauerZiel.status === "offen") {
-      offene.push({ zone: ausdauerZiel.zone, fort: 0, ringMs: 0, restMs: ausdauerZiel.relMs - relMs });
+
+    /* --- Modus-Timing: Ring zieht sich zusammen --- */
+    if (modus === "timing") {
+      var t2 = startTime + 2.5;
+      var cycle = Math.max(0.6, s.beat * 1.5);
+      for (var j = 0; j < 20; j++) {
+        s.schritte.push({ zeit: t2, zone: zufallsZone(), erledigt: false, cycle: cycle });
+        t2 += cycle + 0.45;
+      }
+      s.endeZeit = t2 + 1.0;
     }
+
+    /* --- Modus-Kombination: Folge zeigen, dann nachspielen --- */
+    if (modus === "kombination") {
+      s.runden = 5;
+      s.phase = "zeigen";
+      s.phaseStart = startTime + 1.5;
+      s.seqPos = 0;
+      s.folge = s.level.sequenz.slice();
+    }
+
+    /* --- Modus-Ausdauer: 60 Sekunden, Tempo steigt alle 10 s --- */
+    if (modus === "ausdauer") {
+      s.endeZeit = startTime + 60;
+      s.naechsterSchlag = startTime + 2.0;
+      s.aktiv = null; /* {zeit, zone, stoer} */
+    }
+
+    /* --- Modus-Rhythmus: Beatmap --- */
+    if (modus === "rhythmus") {
+      s.noten = s.level.noten.map(function (n) {
+        return { zeit: startTime + n.beat * s.beat, zone: n.zone, erledigt: false, stoer: false };
+      });
+      /* Störziele: zusaetzliche dunkle Zonen neben einzelnen Noten */
+      if (s.level.stoerziele > 0) {
+        for (var k = 0; k < s.noten.length; k += 3) {
+          if (s.rng() < 0.5) {
+            s.noten.push({ zeit: s.noten[k].zeit, zone: stoerZone(s.noten[k].zone), erledigt: false, stoer: true });
+          }
+        }
+        s.noten.sort(function (a, b) { return a.zeit - b.zeit; });
+      }
+      s.endeZeit = s.noten.length ? s.noten[s.noten.length - 1].zeit + 1.2 : startTime + 5;
+      s.gezaehltBis = 0;
+    }
+
+    return s;
+  }
+
+  function multiplikator(s) { return Math.min(4, 1 + Math.floor(s.serie / 10) * 0.5); }
+
+  function trefferErfassen(s, urteil, zone) {
+    s.ziele += 1;
+    var basis = PUNKTE[urteil];
+    if (urteil !== "miss") {
+      s.treffer += 1;
+      s.serie += 1;
+      s.punkteSumme += basis;
+      s.besteSerie = Math.max(s.besteSerie, s.serie);
+      s.maxMultiplikator = Math.max(s.maxMultiplikator, multiplikator(s));
+    } else {
+      s.serie = 0;
+    }
+    s.feedback = { schluessel: "verdict_" + urteil, zone: zone, bis: 0 };
+    return { urteil: urteil, punkte: basis };
+  }
+
+  function ergebnisBauen(s) {
+    var avg = s.reaktionen.length ? s.reaktionen.reduce(function (a, b) { return a + b; }, 0) / s.reaktionen.length : 0;
+    var dauerSek = Math.max(1, (s.endeZeit || s.t0 + 1) - s.t0);
     return {
-      zustand: zustand, relMs: relMs,
-      punkte: livePunkte(),
-      treffer: daten.treffer, zieleGesamt: zieleGesamtZaehler(),
-      serie: daten.serie, mult: aktiveMult(),
-      offene: offene, stoer: stoer.map(s => s.zone),
-      bpmJetzt: map.modus === "ausdauer" ? ausdauerBpm(relMs) : map.bpm,
-      restSek: map.modus === "ausdauer" ? Math.max(0, Math.ceil((map.dauer_s * 1000 - relMs) / 1000)) : null,
-      trialNr: map.modus === "reaktion" ? Math.min(map.ziel_anzahl, trialIndex + 1) : null,
-      preview: kombiPreview,
-      kombiPos: kombiPos, kombiDurchlauf: kombiDurchlauf,
-      countdown: zustand === ZUSTAND.VORLAEUFER ? Math.max(1, Math.ceil((countinMs() - relMs) / beatMs())) : null
+      punkte: Math.round(s.punkteSumme * s.maxMultiplikator * s.level.levelfaktor),
+      treffer: s.treffer,
+      ziele: s.ziele,
+      quote: s.ziele > 0 ? Math.round(100 * s.treffer / s.ziele) : 0,
+      besteSerie: s.besteSerie,
+      avgReaction: Math.round(avg),
+      minReaction: s.reaktionen.length ? Math.round(Math.min.apply(null, s.reaktionen)) : 0,
+      maxReaction: s.reaktionen.length ? Math.round(Math.max.apply(null, s.reaktionen)) : 0,
+      ppm: Math.round(s.schlaegeGesamt / (dauerSek / 60)),
+      schlaege: s.schlaegeGesamt
     };
   }
 
   return {
-    start, update, zoneAngetippt, pause, weiter, abbrechen, audioNeu, zustandFuerUi,
-    laeuft: () => zustand === ZUSTAND.LAEUFT || zustand === ZUSTAND.VORLAEUFER,
-    zustandGeben: () => zustand
+    start: function (modus, levelDef, kalibrierungMs, startTime, validate) {
+      if (validate) {
+        var fehler = validate(levelDef);
+        if (fehler.length) { return { fehler: fehler }; }
+      }
+      state = neuerLauf(modus, levelDef, kalibrierungMs, startTime);
+      return { ok: true };
+    },
+    getState: function () { return state; },
+
+    tick: function (now, audio) {
+      if (!state || state.beendet) { return; }
+      var s = state;
+      s.laufzeit = now - s.t0;
+      if (s.feedback && now > s.feedback.bis) { s.feedback = null; }
+      s.zonenAn = {};
+      s.ring = null;
+
+      if (now < s.meldungBis && s.meldung) {
+        if (now >= s.t0 + 1.2 && s.meldung === "game_ready") {
+          s.meldung = "game_go";
+          if (audio) { audio.accentAt(now); }
+          s.meldungBis = now + 0.7;
+        }
+        return;
+      }
+      s.meldung = null;
+
+      var m = s.modus;
+
+      if (m === "reaktion" || m === "timing") {
+        for (var i = 0; i < s.schritte.length; i++) {
+          var sch = s.schritte[i];
+          if (sch.erledigt) { continue; }
+          if (m === "reaktion" && now >= sch.zeit) {
+            s.zonenAn[sch.zone] = "hell";
+            if (sch.stoer) { s.zonenAn[sch.stoer] = "stoer"; }
+            if (now > sch.zeit + s.fenster / 1000) {
+              sch.erledigt = true;
+              trefferErfassen(s, "miss", sch.zone);
+            }
+          }
+          if (m === "timing") {
+            var vorbereitung = sch.zeit - sch.cycle;
+            if (now >= vorbereitung && now <= sch.zeit + s.fenster / 1000) {
+              var p = (now - vorbereitung) / (sch.cycle);
+              s.ring = { zone: sch.zone, progress: Math.min(1, p) };
+              s.zonenAn[sch.zone] = "ring";
+              if (now > sch.zeit + s.fenster / 1000 && !sch.erledigt) {
+                sch.erledigt = true;
+                trefferErfassen(s, "miss", sch.zone);
+              }
+            } else if (now > sch.zeit + s.fenster / 1000 && !sch.erledigt) {
+              sch.erledigt = true;
+              trefferErfassen(s, "miss", sch.zone);
+            }
+          }
+        }
+        if (now >= s.endeZeit) { this.beenden(); }
+      }
+
+      if (m === "kombination") {
+        if (s.phase === "zeigen") {
+          var idx = Math.floor((now - s.phaseStart) / (s.beat * 0.75));
+          if (idx >= 0 && idx < s.folge.length && idx !== s.seqPos - 1) {
+            s.zonenAn[s.folge[idx]] = "hell";
+            if (audio && idx !== s.seqGehoert) { audio.tickAt(now); s.seqGehoert = idx; }
+          }
+          if (now > s.phaseStart + s.folge.length * s.beat * 0.75 + 0.4) {
+            s.phase = "spielen";
+            s.phaseStart = now + 0.6;
+            s.seqPos = 0;
+            s.meldung = "combo_your_turn";
+            s.meldungBis = now + 0.6;
+          }
+        } else if (s.phase === "spielen") {
+          if (now < s.phaseStart) { return; }
+          if (s.seqPos < s.folge.length) {
+            var erwartet = s.phaseStart + s.seqPos * s.beat;
+            var rest = erwartet - now;
+            if (rest < s.beat * 0.5) { s.zonenAn[s.folge[s.seqPos]] = "ring"; s.ring = { zone: s.folge[s.seqPos], progress: 1 - Math.max(0, rest) / (s.beat * 0.5) }; }
+            if (now > erwartet + s.fenster / 1000) {
+              trefferErfassen(s, "miss", s.folge[s.seqPos]);
+              s.seqPos += 1;
+              if (audio) { audio.miss(); }
+            }
+          } else {
+            s.komboRunde += 1;
+            if (s.komboRunde >= s.runden) { this.beenden(); return; }
+            s.phase = "zeigen";
+            s.phaseStart = now + 1.2;
+            s.seqPos = 0;
+            s.seqGehoert = -1;
+            var neu = s.folge.slice();
+            if (s.komboRunde >= 2 && neu.length < 6 && s.level.stoerziele > 0) {
+              neu.push(1 + Math.floor(s.rng() * s.level.aktiveZonen));
+            }
+            s.folge = neu;
+            s.meldung = "combo_memorize";
+            s.meldungBis = now + 1.2;
+          }
+        }
+      }
+
+      if (m === "ausdauer") {
+        var stufe = Math.min(5, Math.floor((now - s.t0) / 10));
+        var intervall = s.beat * Math.max(0.35, 0.8 - stufe * 0.09);
+        if (s.aktiv && now > s.aktiv.zeit + s.fenster / 1000) {
+          trefferErfassen(s, "miss", s.aktiv.zone);
+          s.aktiv = null;
+        }
+        if (!s.aktiv && now >= s.naechsterSchlag && now < s.endeZeit - 0.5) {
+          var z = zufallsZone();
+          s.aktiv = { zeit: now, zone: z, stoer: s.level.stoerziele > 0 && s.rng() < 0.3 ? stoerZone(z) : 0 };
+          s.naechsterSchlag = now + intervall;
+          if (audio) { audio.tickAt(now); }
+        }
+        if (s.aktiv && now >= s.aktiv.zeit) {
+          s.zonenAn[s.aktiv.zone] = "hell";
+          if (s.aktiv.stoer) { s.zonenAn[s.aktiv.stoer] = "stoer"; }
+        }
+        if (now >= s.endeZeit) { this.beenden(); }
+      }
+
+      if (m === "rhythmus") {
+        /* Musik-Kulisse: Kick/Snare/Hat auf dem Beat, voraus geplant */
+        if (audio) {
+          var horizon = now + 0.4;
+          while (s.gezaehltBis < horizon) {
+            var b = Math.floor((s.gezaehltBis - s.t0) / s.beat);
+            var bt = s.t0 + b * s.beat;
+            if (bt >= now - 0.05 && bt < horizon) {
+              if (b % 2 === 0) { audio.kickAt(bt); } else { audio.snareAt(bt); }
+              audio.hihatAt(bt + s.beat / 2);
+            }
+            s.gezaehltBis = s.t0 + (b + 1) * s.beat;
+          }
+        }
+        for (var n = 0; n < s.noten.length; n++) {
+          var no = s.noten[n];
+          if (!no.erledigt) {
+            if (now >= no.zeit - 0.3) { s.zonenAn[no.zone] = no.stoer ? "stoer" : "hell"; }
+            if (now > no.zeit + s.fenster / 1000) {
+              no.erledigt = true;
+              if (!no.stoer) { trefferErfassen(s, "miss", no.zone); }
+            }
+          }
+        }
+        if (now >= s.endeZeit) { this.beenden(); }
+      }
+    },
+
+    /* zone: 1..6, t: Audio-Zeit des Tippens (aus event.timeStamp umgerechnet). */
+    onTap: function (zone, t, audio) {
+      if (!state || state.beendet) { return null; }
+      var s = state;
+      if (s.meldung && t < s.meldungBis) { return null; }
+      s.schlaegeGesamt += 1;
+      var m = s.modus;
+      var abw, urteil, sch, i;
+
+      if (m === "reaktion") {
+        for (i = 0; i < s.schritte.length; i++) {
+          sch = s.schritte[i];
+          if (!sch.erledigt && t >= sch.zeit - 0.05) {
+            sch.erledigt = true;
+            if (zone === sch.stoer) {
+              urteil = "miss";
+              trefferErfassen(s, urteil, zone);
+            } else if (zone === sch.zone) {
+              abw = (t - sch.zeit) * 1000 - s.kalib;
+              s.reaktionen.push(Math.max(0, Math.round(abw)));
+              urteil = beurteilen(abw, s.fenster);
+              trefferErfassen(s, urteil, zone);
+            } else {
+              urteil = "miss";
+              trefferErfassen(s, urteil, zone);
+            }
+            if (audio) { urteil === "miss" ? audio.miss() : audio.hit(zone); }
+            return { urteil: urteil };
+          }
+        }
+        return null; /* kein Ziel aktiv */
+      }
+
+      if (m === "timing") {
+        for (i = 0; i < s.schritte.length; i++) {
+          sch = s.schritte[i];
+          if (!sch.erledigt && t >= sch.zeit - sch.cycle) {
+            sch.erledigt = true;
+            if (zone === sch.zone) {
+              abw = (t - sch.zeit) * 1000 - s.kalib;
+              s.reaktionen.push(Math.max(0, Math.round(Math.abs(abw))));
+              urteil = beurteilen(abw, s.fenster);
+              trefferErfassen(s, urteil, zone);
+            } else {
+              urteil = "miss";
+              trefferErfassen(s, urteil, zone);
+            }
+            if (audio) { urteil === "miss" ? audio.miss() : audio.hit(zone); }
+            return { urteil: urteil };
+          }
+        }
+        return null;
+      }
+
+      if (m === "kombination") {
+        if (s.phase !== "spielen" || t < s.phaseStart) { return null; }
+        var erwartet = s.phaseStart + s.seqPos * s.beat;
+        var erwarteteZone = s.folge[s.seqPos];
+        if (!erwarteteZone) { return null; }
+        if (zone === erwarteteZone) {
+          abw = (t - erwartet) * 1000 - s.kalib;
+          s.reaktionen.push(Math.max(0, Math.round(Math.abs(abw))));
+          urteil = beurteilen(abw, s.fenster);
+          s.seqPos += 1;
+          trefferErfassen(s, urteil, zone);
+          if (audio) { audio.hit(zone); }
+          return { urteil: urteil };
+        }
+        urteil = "miss";
+        trefferErfassen(s, urteil, zone);
+        s.seqPos += 1; /* falsche Zone beendet die Serie fuer diesen Folgeschlag */
+        if (audio) { audio.miss(); }
+        return { urteil: urteil };
+      }
+
+      if (m === "ausdauer") {
+        if (!s.aktiv || t < s.aktiv.zeit - 0.05) { return null; }
+        var ziel = s.aktiv;
+        s.aktiv = null;
+        if (zone === ziel.zone) {
+          abw = (t - ziel.zeit) * 1000 - s.kalib;
+          s.reaktionen.push(Math.max(0, Math.round(abw)));
+          urteil = beurteilen(abw, s.fenster);
+          trefferErfassen(s, urteil, zone);
+        } else {
+          urteil = "miss";
+          trefferErfassen(s, urteil, zone);
+        }
+        if (audio) { urteil === "miss" ? audio.miss() : audio.hit(zone); }
+        return { urteil: urteil };
+      }
+
+      if (m === "rhythmus") {
+        for (i = 0; i < s.noten.length; i++) {
+          var no = s.noten[i];
+          if (!no.erledigt && Math.abs(t - no.zeit) * 1000 <= s.fenster + 40) {
+            no.erledigt = true;
+            if (zone === no.zone) {
+              if (no.stoer) {
+                urteil = "miss";
+                trefferErfassen(s, urteil, zone);
+              } else {
+                abw = (t - no.zeit) * 1000 - s.kalib;
+                s.reaktionen.push(Math.max(0, Math.round(Math.abs(abw))));
+                urteil = beurteilen(abw, s.fenster);
+                trefferErfassen(s, urteil, zone);
+              }
+            } else {
+              urteil = "miss";
+              trefferErfassen(s, urteil, zone);
+            }
+            if (audio) { urteil === "miss" ? audio.miss() : audio.hit(zone); }
+            return { urteil: urteil };
+          }
+        }
+        return null;
+      }
+      return null;
+    },
+
+    beenden: function () {
+      if (!state || state.beendet) { return state ? state.ergebnis : null; }
+      state.beendet = true;
+      state.ergebnis = ergebnisBauen(state);
+      return state.ergebnis;
+    },
+
+    view: function () {
+      if (!state) { return null; }
+      var s = state;
+      return {
+        meldung: s.meldung,
+        zonenAn: s.zonenAn,
+        ring: s.ring,
+        punkte: Math.round(s.punkteSumme * multiplikator(s) * s.level.levelfaktor),
+        treffer: s.treffer,
+        ziele: s.ziele,
+        serie: s.serie,
+        multiplikator: multiplikator(s),
+        zeit: s.modus === "ausdauer" ? Math.max(0, Math.ceil(s.endeZeit - s.t0 - (s.laufzeit || 0))) : null,
+        phase: s.phase || null,
+        folge: s.modus === "kombination" ? s.folge : null,
+        seqPos: s.seqPos,
+        beendet: s.beendet,
+        ergebnis: s.ergebnis,
+        feedback: s.feedback
+      };
+    }
   };
-})();
+});
