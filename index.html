@@ -1,0 +1,154 @@
+<!DOCTYPE html>
+<html lang="de" dir="ltr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="format-detection" content="telephone=no">
+<meta name="color-scheme" content="dark">
+<meta name="theme-color" content="#0d1f3a">
+<title></title>
+<link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+<main id="app">
+
+  <section id="s-menue" class="screen" data-screen="menue">
+    <header class="kopf">
+      <h1 class="wortmarke" data-i18n="app.titel"></h1>
+      <p class="unterzeile" data-i18n="app.unterzeile"></p>
+    </header>
+    <p id="menue-meldung" class="meldung" role="status" hidden></p>
+
+    <h2 class="abschnitt" data-i18n="menue.modus"></h2>
+    <div id="modus-liste" class="modus-liste" role="radiogroup"></div>
+
+    <h2 class="abschnitt" data-i18n="menue.level"></h2>
+    <div id="level-raster" class="level-raster" role="radiogroup"></div>
+    <p id="level-details" class="level-details"></p>
+
+    <button id="btn-start" class="knopf haupt" type="button" data-i18n="menue.start"></button>
+    <button id="kalib-anzeige" class="kalib-anzeige" type="button"></button>
+
+    <nav class="menue-nav">
+      <button class="knopf nav" type="button" data-ziel="bestenliste" data-i18n="nav.bestenliste"></button>
+      <button class="knopf nav" type="button" data-ziel="verlauf" data-i18n="nav.verlauf"></button>
+      <button class="knopf nav" type="button" data-ziel="kalibrierung" data-i18n="nav.kalibrierung"></button>
+      <button class="knopf nav" type="button" data-ziel="hilfe" data-i18n="nav.hilfe"></button>
+      <button class="knopf nav" type="button" data-ziel="einstellungen" data-i18n="nav.einstellungen"></button>
+    </nav>
+    <p id="build-info" class="fuss"></p>
+  </section>
+
+  <section id="s-spiel" class="screen spiel" data-screen="spiel" hidden>
+    <div class="hud">
+      <button id="btn-abbrechen" class="knopf klein" type="button" data-i18n="spiel.abbrechen"></button>
+      <div class="hud-wert"><span class="hud-label" data-i18n="hud.punkte"></span><span id="hud-punkte" class="hud-zahl zahl"></span></div>
+      <div class="hud-wert"><span class="hud-label" data-i18n="hud.serie"></span><span id="hud-serie" class="hud-zahl zahl"></span></div>
+      <div class="hud-wert"><span class="hud-label" data-i18n="hud.multi"></span><span id="hud-multi" class="hud-zahl zahl"></span></div>
+      <div class="hud-wert"><span id="hud-fortschritt-label" class="hud-label" data-i18n="hud.treffer"></span><span id="hud-fortschritt" class="hud-zahl zahl"></span></div>
+    </div>
+    <div class="spiel-info">
+      <p id="spiel-status" class="spiel-status" aria-live="polite"></p>
+      <div id="folge-anzeige" class="folge" aria-live="polite"></div>
+    </div>
+    <div id="zonen" class="zonen"></div>
+  </section>
+
+  <section id="s-ergebnis" class="screen" data-screen="ergebnis" hidden>
+    <header class="leiste"><h2 data-i18n="ergebnis.titel"></h2></header>
+    <p id="erg-kopf" class="erg-kopf"></p>
+    <div class="erg-punkte">
+      <span class="erg-label" data-i18n="ergebnis.punkte"></span>
+      <span id="erg-punkte" class="erg-zahl zahl"></span>
+      <span id="erg-formel" class="erg-formel"></span>
+    </div>
+    <div id="erg-sterne" class="sterne gross" role="img"></div>
+    <p id="erg-treffer" class="erg-treffer"></p>
+    <dl id="erg-werte" class="erg-werte"></dl>
+    <p id="erg-urteile" class="erg-nebensatz"></p>
+    <p id="erg-fehler" class="erg-nebensatz"></p>
+    <p id="erg-platz" class="erg-platz"></p>
+    <div class="knopfreihe">
+      <button id="btn-nochmal" class="knopf haupt" type="button" data-i18n="ergebnis.nochmal"></button>
+      <button id="btn-erg-menue" class="knopf" type="button" data-i18n="ergebnis.menue"></button>
+    </div>
+  </section>
+
+  <section id="s-bestenliste" class="screen" data-screen="bestenliste" hidden>
+    <header class="leiste">
+      <button class="knopf klein zurueck" type="button" data-i18n="nav.zurueck"></button>
+      <h2 data-i18n="bestenliste.titel"></h2>
+    </header>
+    <div id="bl-modi" class="reiter" role="tablist"></div>
+    <div id="bl-level" class="reiter klein" role="tablist"></div>
+    <div class="tabelle-rahmen"><table id="bl-tabelle" class="tabelle"></table></div>
+    <p id="bl-leer" class="leer" data-i18n="bestenliste.leer" hidden></p>
+    <p class="hinweis" data-i18n="bestenliste.hinweis"></p>
+  </section>
+
+  <section id="s-verlauf" class="screen" data-screen="verlauf" hidden>
+    <header class="leiste">
+      <button class="knopf klein zurueck" type="button" data-i18n="nav.zurueck"></button>
+      <h2 data-i18n="verlauf.titel"></h2>
+    </header>
+    <p class="hinweis" data-i18n="verlauf.erklaerung"></p>
+    <div id="verlauf-grafik" class="verlauf-grafik"></div>
+    <p id="verlauf-info" class="verlauf-info"></p>
+  </section>
+
+  <section id="s-kalibrierung" class="screen" data-screen="kalibrierung" hidden>
+    <header class="leiste">
+      <button class="knopf klein zurueck" type="button" data-i18n="nav.zurueck"></button>
+      <h2 data-i18n="kalib.titel"></h2>
+    </header>
+    <p data-i18n="kalib.erklaerung"></p>
+    <p class="warnung" data-i18n="kalib.bluetooth"></p>
+    <div id="kalib-pad" class="kalib-pad" role="button">
+      <span id="kalib-pad-text" class="kalib-pad-text" data-i18n="kalib.pad"></span>
+      <span id="kalib-zaehler" class="kalib-zaehler zahl"></span>
+    </div>
+    <p id="kalib-status" class="kalib-status" aria-live="polite"></p>
+    <p id="kalib-wert" class="kalib-wert"></p>
+    <div class="knopfreihe">
+      <button id="btn-kalib-start" class="knopf haupt" type="button" data-i18n="kalib.start"></button>
+      <button id="btn-kalib-null" class="knopf" type="button" data-i18n="kalib.zuruecksetzen"></button>
+    </div>
+  </section>
+
+  <section id="s-hilfe" class="screen" data-screen="hilfe" hidden>
+    <header class="leiste">
+      <button class="knopf klein zurueck" type="button" data-i18n="nav.zurueck"></button>
+      <h2 data-i18n="hilfe.titel"></h2>
+    </header>
+    <article id="hilfe-inhalt" class="hilfe"></article>
+  </section>
+
+  <section id="s-einstellungen" class="screen" data-screen="einstellungen" hidden>
+    <header class="leiste">
+      <button class="knopf klein zurueck" type="button" data-i18n="nav.zurueck"></button>
+      <h2 data-i18n="einst.titel"></h2>
+    </header>
+    <label class="feld"><span data-i18n="einst.name"></span>
+      <input id="einst-name" type="text" maxlength="16" autocomplete="off" autocapitalize="words" spellcheck="false" data-i18n-platzhalter="einst.name_platzhalter">
+    </label>
+    <label class="feld"><span data-i18n="einst.sprache"></span>
+      <select id="einst-sprache"></select>
+    </label>
+    <div class="feld">
+      <span data-i18n="einst.vibration"></span>
+      <button id="einst-vibration" class="schalter" type="button" role="switch"></button>
+    </div>
+    <p class="hinweis" data-i18n="einst.daten"></p>
+  </section>
+
+</main>
+<script src="js/i18n.js"></script>
+<script src="js/levels.js"></script>
+<script src="js/storage.js"></script>
+<script src="js/audio.js"></script>
+<script src="js/game.js"></script>
+<script src="js/main.js"></script>
+</body>
+</html>

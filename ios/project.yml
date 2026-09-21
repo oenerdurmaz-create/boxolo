@@ -1,35 +1,86 @@
+# BeatBox – iOS-Hülle.
+# Aus dieser Datei erzeugt XcodeGen das Xcode-Projekt:  cd ios && xcodegen generate
+# Die erzeugte BeatBox.xcodeproj und die Info.plist werden nicht eingecheckt.
+#
+# Vor dem ersten Build anpassen: PRODUCT_BUNDLE_IDENTIFIER (identisch in codemagic.yaml).
+
 name: BeatBox
+
 options:
-  bundleIdPrefix: de.beatbox
-  xcodeVersion: "15.0"
+  deploymentTarget:
+    iOS: "16.0"
+  developmentLanguage: de
+  createIntermediateGroups: true
+
+settings:
+  base:
+    SWIFT_VERSION: "5.0"
+
 targets:
   BeatBox:
     type: application
     platform: iOS
     deploymentTarget: "16.0"
     sources:
-      - path: BeatBox/Sources
-      - path: ../boxreaktion
-        name: boxreaktion
+      - path: BeatBox
+        excludes:
+          - PrivacyInfo.xcprivacy
+      - path: BeatBox/PrivacyInfo.xcprivacy
         buildPhase: resources
-    settings:
-      base:
-        PRODUCT_BUNDLE_IDENTIFIER: de.beatbox.game
-        PRODUCT_NAME: BeatBox
-        MARKETING_VERSION: "1.0.0"
-        CURRENT_PROJECT_VERSION: "1"
-        TARGETED_DEVICE_FAMILY: "1"
-        ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
-        SWIFT_VERSION: "5.0"
+      # Web-Paket aus dem Hauptverzeichnis, unverändert ins App-Bundle kopiert.
+      - path: ../index.html
+        group: Web
+        buildPhase: resources
+      - path: ../css
+        type: folder
+        group: Web
+        buildPhase: resources
+      - path: ../js
+        type: folder
+        group: Web
+        buildPhase: resources
     info:
-      path: BeatBox/Resources/Info.plist
+      path: BeatBox/Info.plist
       properties:
-        CFBundleName: BeatBox
         CFBundleDisplayName: BeatBox
-        UILaunchScreen: {}
+        CFBundleShortVersionString: $(MARKETING_VERSION)
+        CFBundleVersion: $(CURRENT_PROJECT_VERSION)
+        LSRequiresIPhoneOS: true
+        ITSAppUsesNonExemptEncryption: false
+        UIRequiredDeviceCapabilities: [arm64]
+        UISupportedInterfaceOrientations: [UIInterfaceOrientationPortrait]
         UIRequiresFullScreen: true
         UIStatusBarHidden: true
-        UIViewControllerBasedStatusBarAppearance: false
-        UISupportedInterfaceOrientations:
-          - UIInterfaceOrientationPortrait
-        NSMicrophoneUsageDescription: "BeatBox erzeugt alle Klänge lokal auf dem Gerät."
+        UIViewControllerBasedStatusBarAppearance: true
+        UILaunchScreen:
+          UIColorName: Startfarbe
+        UIApplicationSceneManifest:
+          UIApplicationSupportsMultipleScenes: false
+          UISceneConfigurations:
+            UIWindowSceneSessionRoleApplication:
+              - UISceneConfigurationName: Standard
+                UISceneDelegateClassName: $(PRODUCT_MODULE_NAME).SceneDelegate
+    settings:
+      base:
+        PRODUCT_NAME: BeatBox
+        PRODUCT_BUNDLE_IDENTIFIER: de.example.beatbox
+        MARKETING_VERSION: "1.0"
+        CURRENT_PROJECT_VERSION: "1"
+        VERSIONING_SYSTEM: apple-generic
+        TARGETED_DEVICE_FAMILY: "1"
+        ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
+        GENERATE_INFOPLIST_FILE: "NO"
+        SUPPORTS_MACCATALYST: "NO"
+        SUPPORTS_MAC_DESIGNED_FOR_IPHONE_IPAD: "NO"
+        SUPPORTS_XR_DESIGNED_FOR_IPHONE_IPAD: "NO"
+        CODE_SIGN_STYLE: Automatic
+
+schemes:
+  BeatBox:
+    build:
+      targets:
+        BeatBox: all
+    run:
+      config: Debug
+    archive:
+      config: Release

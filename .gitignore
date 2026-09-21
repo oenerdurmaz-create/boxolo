@@ -1,10 +1,11 @@
-ios/build/
-ios/*.xcodeproj/
-ios/*.xcworkspace/
-xcuserdata/
-*.xcarchive
-*.ipa
-*.dSYM.zip
+# Von XcodeGen erzeugt, Quelle ist ios/project.yml
+ios/BeatBox.xcodeproj/
+ios/BeatBox/Info.plist
+# Xcode und macOS
+build/
 DerivedData/
-node_modules/
+*.xcuserstate
+xcuserdata/
 .DS_Store
+# Lieferpakete
+*.zip

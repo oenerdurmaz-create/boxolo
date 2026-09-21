@@ -1,55 +1,43 @@
-# BeatBox — Codemagic-Konfiguration: Web-Paket pruefen, iOS bauen, zu TestFlight laden.
-# Voraussetzungen (in Codemagic unter "Environment variables" / "Code signing identities"):
-#   Environment-Gruppe "appstore-connect" mit:
-#     APP_STORE_CONNECT_ISSUER_ID, APP_STORE_CONNECT_KEY_ID,
-#     APP_STORE_CONNECT_PRIVATE_KEY (Inhalt der .p8), TEAM_ID
-#   Code signing: iOS Distribution Zertifikat + App Store Provisioning Profile.
+# BeatBox – Codemagic-Ablauf für TestFlight.
+# Vor dem ersten Start drei Platzhalter ersetzen (siehe README, Abschnitt iOS):
+#   1. app_store_connect: Name des App-Store-Connect-API-Schlüssels in Codemagic
+#   2. bundle_identifier: identisch mit PRODUCT_BUNDLE_IDENTIFIER in ios/project.yml
+#   3. APP_STORE_APPLE_ID: Apple-ID der App aus App Store Connect (App-Informationen)
 workflows:
   ios-testflight:
-    name: iOS Build zu TestFlight
-    instance_type: mac_mini_m1
-    max_build_duration: 60
+    name: BeatBox iOS TestFlight
+    max_build_duration: 45
+    instance_type: mac_mini_m2
+    integrations:
+      app_store_connect: BeatBox API-Schluessel
     environment:
-      ios: latest
+      ios_signing:
+        distribution_type: app_store
+        bundle_identifier: de.example.beatbox
+      vars:
+        APP_STORE_APPLE_ID: 0000000000
       xcode: latest
-      node: 20
-      groups:
-        - appstore-connect
-    triggering:
-      events:
-        - tag
-      tag_patterns:
-        - pattern: v*.*.*
-          include: true
-      cancel_previous_builds: true
     scripts:
-      - name: Web-Paket pruefen
-        script: node boxreaktion/tools/pruefung.js
-      - name: Projekt erzeugen
-        script: brew install xcodegen >/dev/null && cd ios && xcodegen
-      - name: Buildnummer aus Tag setzen
+      - name: Web-Paket und iOS-Hülle prüfen
+        script: node tools/pruefung.js --release
+      - name: Xcode-Projekt erzeugen
         script: |
-          BUILDNUM=$(echo "$CM_TAG" | tr -d 'v.')
-          /usr/libexec/PlistBuddy -c "Set :CFBundleVersion $BUILDNUM" ios/BeatBox/Resources/Info.plist
-      - name: Archivieren
+          brew install xcodegen
+          cd ios
+          xcodegen generate
+      - name: Signierprofile übernehmen
+        script: xcode-project use-profiles
+      - name: Buildnummer erhöhen
         script: |
           cd ios
-          xcodebuild -project BeatBox.xcodeproj -scheme BeatBox             -configuration Release             -archivePath build/BeatBox.xcarchive             archive             CODE_SIGN_STYLE=Manual             DEVELOPMENT_TEAM="$TEAM_ID"
-      - name: Exportieren und zu TestFlight hochladen
-        script: |
-          cd ios
-          xcodebuild -exportArchive             -archivePath build/BeatBox.xcarchive             -exportPath build             -exportOptionsPlist exportOptions.plist             -allowProvisioningUpdates
+          LETZTE=$(app-store-connect get-latest-testflight-build-number "$APP_STORE_APPLE_ID" || echo 0)
+          agvtool new-version -all $((LETZTE + 1))
+      - name: IPA bauen
+        script: xcode-project build-ipa --project ios/BeatBox.xcodeproj --scheme BeatBox
     artifacts:
-      - ios/build/*.ipa
-      - ios/build/*.dSYM.zip
+      - build/ios/ipa/*.ipa
+      - /tmp/xcodebuild_logs/*.log
     publishing:
       app_store_connect:
-        api_key: $APP_STORE_CONNECT_PRIVATE_KEY
-        api_issuer: $APP_STORE_CONNECT_ISSUER_ID
-        api_key_id: $APP_STORE_CONNECT_KEY_ID
+        auth: integration
         submit_to_testflight: true
-        submit_to_app_store: false
-    cache:
-      cache_paths:
-        - ~/.pub-cache
-        - $CM_BUILD_DIR/node_modules
