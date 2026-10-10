@@ -14,7 +14,8 @@
 - Architektur wie Rechenpyramide: **native Hülle + WKWebView**, gesamte Spiellogik im Web-Paket (HTML/CSS/JavaScript, keine Bibliotheken, kein Build-Schritt). Besonderheit gegenüber der Rechenpyramide: Die Web-Dateien werden über ein eigenes URL-Schema `beatbox://localhost/` ausgeliefert statt über `file://`, damit `localStorage` eine stabile Herkunft hat und erhalten bleibt.
 - Das Xcode-Projekt wird aus `ios/project.yml` per **XcodeGen** erzeugt und ist bewusst **nicht** eingecheckt.
 - Spielstand: `localStorage`, kein Server, keine Konten, keine Tracker, kein Netzwerkzugriff im Swift-Code.
-- Sprachen: **zurzeit nur Deutsch aktiv.** Die Struktur in `js/i18n.js` ist bereits auf zwölf Sprachen ausgelegt (de, en, fr, es, it, pt, nl, pl, tr, ar, ja, zh), jede mit Leserichtung und Locale. Eine Sprache wird aktiv, sobald sie in `SPRACHEN` steht.
+- Sprachen: **zurzeit nur Deutsch aktiv, Ziel sind alle zwölf** (de, en, fr, es, it, pt, nl, pl, tr, ar, ja, zh) wie bei der Rechenpyramide. Die Struktur in `js/i18n.js` ist darauf ausgelegt, jede Sprache trägt Leserichtung und Locale. Eine Sprache wird aktiv, sobald sie in `SPRACHEN` steht. Arabisch ist RTL; Zahlen und Rechnungen bleiben isoliert.
+- **Zielgruppe: Kinder** (Entscheidung 10.10.2026). Daraus folgt die Kinder-Kategorie im App Store: keine Tracker, keine Werbung, keine Analytik Dritter, keine externen Links und keine Käufe ohne Elternhürde. Das Spiel erfüllt das bereits, weil es ohne Netzwerk auskommt. Wichtig für die Darstellung: Es wird auf **Pratzen** geschlagen wie im Training, nicht auf einen Gegner. Kein Kampf, kein Treffer am Körper, keine Niederlage.
 
 ### Herkunft
 
@@ -162,14 +163,19 @@ Das ist die wichtigste Liste des ganzen Dokuments:
 
 ---
 
-## 9. Offene Entscheidungen (vor dem nächsten Build klären)
+## 9. Entscheidungen vom 10.10.2026
 
-1. **Name.** „BeatBox" ist im App Store doppeldeutig (Beatboxing, Musikboxen) und dicht besetzt. Markenname plus beschreibender Untertitel wäre auffindbarer. Verfügbarkeit in App Store Connect und beim DPMA/EUIPO prüfen.
-2. **Zielgruppe und Altersfreigabe.** Erwachsene Reaktionstrainer oder Kinder wie bei der Rechenpyramide? Das entscheidet über Kinder-Kategorie, Tonfall, Farbwelt und Store-Text.
-3. **Weitere Sprachen.** Welche der zwölf vorbereiteten Sprachen kommen in den ersten Store-Build? Deutsch und Englisch genügen für den Start; Arabisch bringt RTL-Aufwand.
-4. **Musik.** Zurzeit nur erzeugte Klänge. Richtige Musikstücke wären spürbar besser, brauchen aber eine saubere Lizenz und würden die Regel „keine Audiodateien im Paket" aufheben.
-5. **Umfang des nächsten Builds.** Vorschlag: Build 3 = defekter GitHub-Workflow repariert, Englisch aktiviert, erster Codemagic-Lauf. Alles andere erst nach dem ersten Gerätetest.
-6. **Android.** Später über eine Kotlin-WebView-Hülle möglich, wie bei der Rechenpyramide geplant.
+- **Zielgruppe: Kinder.** Kinder-Kategorie im App Store, Altersband noch festzulegen (6 bis 8 oder 9 bis 11). Tonfall und Farbwelt entsprechend.
+- **Alle zwölf Sprachen** kommen in den ersten Store-Build, nicht nur Deutsch und Englisch.
+- **Zuschnitt Build 3:** GitHub-Workflow repariert, elf weitere Sprachen ergänzt, erster Codemagic-Lauf. Alles Weitere erst nach dem Gerätetest.
+
+### Noch offen
+
+1. **Name.** „BeatBox" ist doppeldeutig (Beatboxing, Musikbox) und für Kinder nicht erklärend. Entscheidung über Markenname und Untertitel steht aus; davon hängt der Textschlüssel `app.titel` in allen zwölf Sprachen ab, deshalb vor der Übersetzung klären.
+2. **Altersband** in App Store Connect: 6 bis 8 oder 9 bis 11 Jahre.
+3. **Musik.** Zurzeit nur erzeugte Klänge. Richtige Musikstücke wären spürbar besser, brauchen aber eine saubere Lizenz und würden die Regel „keine Audiodateien im Paket" aufheben.
+4. **Mehrsprachige Prüfung.** Trick der Rechenpyramide: Namen und Kurztexte in Japanisch, Chinesisch, Arabisch und Türkisch muttersprachlich gegenlesen lassen. Im Türkischen kein „hile" (bedeutet auch Schummeln).
+5. **Android.** Später über eine Kotlin-WebView-Hülle möglich, wie bei der Rechenpyramide geplant.
 
 ---
 

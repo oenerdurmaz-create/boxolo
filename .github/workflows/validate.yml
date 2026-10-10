@@ -14,4 +14,4 @@ jobs:
         with:
           node-version: 20
       - name: Pruefskript
-        run: node boxreaktion/tools/pruefung.js
+        run: node tools/pruefung.js
