@@ -2,7 +2,7 @@
 (function (global) {
   'use strict';
   var BB = global.BB;
-  var BUILD = 2;
+  var BUILD = 3;
   var doc = global.document;
   var t = BB.i18n.t;
   var zahl = BB.i18n.zahl;

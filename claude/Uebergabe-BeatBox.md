@@ -1,4 +1,4 @@
-# Übergabe-Notiz BeatBox (Stand 10.10.2026, Build 2 auf `main`)
+# Übergabe-Notiz Boxolo (Stand 10.10.2026, Build 3 auf `main`)
 
 > Diese Datei ist der Startpunkt für jeden neuen Chat zu diesem Projekt. Bitte vollständig lesen.
 > Der Code ist die technische Grundlage, nicht diese Beschreibung. Weichen beide voneinander ab:
@@ -8,13 +8,13 @@
 
 ## 1. Projekt in Kürze
 
-- iPhone-Spiel **„BeatBox"** — Reaktions- und Rhythmusspiel. Sechs Trefferzonen in Boxnotation, der Spieler tippt sie so schnell und so genau wie möglich an. Gemessen werden Reaktionszeit in Millisekunden, Trefferquote und Serienlänge.
+- iPhone-Spiel **„Boxolo"** (Anzeigename seit Build 3; interne Bezeichner, Bundle-ID und URL-Schema heißen weiterhin BeatBox) — Reaktions- und Rhythmusspiel. Sechs Trefferzonen in Boxnotation, der Spieler tippt sie so schnell und so genau wie möglich an. Gemessen werden Reaktionszeit in Millisekunden, Trefferquote und Serienlänge.
 - Repo: https://github.com/oenerdurmaz-create/beatbox (Branch `main`, privat). Arbeit nur per Git (commit + push), keine ZIPs.
 - Bundle-ID: `de.LaraJade.beatbox`. Apple-ID der App in App Store Connect: `6814647151`. Version 1.0, iOS 16+, nur iPhone, nur Hochformat.
 - Architektur wie Rechenpyramide: **native Hülle + WKWebView**, gesamte Spiellogik im Web-Paket (HTML/CSS/JavaScript, keine Bibliotheken, kein Build-Schritt). Besonderheit gegenüber der Rechenpyramide: Die Web-Dateien werden über ein eigenes URL-Schema `beatbox://localhost/` ausgeliefert statt über `file://`, damit `localStorage` eine stabile Herkunft hat und erhalten bleibt.
 - Das Xcode-Projekt wird aus `ios/project.yml` per **XcodeGen** erzeugt und ist bewusst **nicht** eingecheckt.
 - Spielstand: `localStorage`, kein Server, keine Konten, keine Tracker, kein Netzwerkzugriff im Swift-Code.
-- Sprachen: **zurzeit nur Deutsch aktiv, Ziel sind alle zwölf** (de, en, fr, es, it, pt, nl, pl, tr, ar, ja, zh) wie bei der Rechenpyramide. Die Struktur in `js/i18n.js` ist darauf ausgelegt, jede Sprache trägt Leserichtung und Locale. Eine Sprache wird aktiv, sobald sie in `SPRACHEN` steht. Arabisch ist RTL; Zahlen und Rechnungen bleiben isoliert.
+- Sprachen: **alle zwölf aktiv seit Build 3** (de, en, fr, es, it, pt, nl, pl, tr, ar, ja, zh) wie bei der Rechenpyramide. Die Struktur in `js/i18n.js` ist darauf ausgelegt, jede Sprache trägt Leserichtung und Locale. Eine Sprache wird aktiv, sobald sie in `SPRACHEN` steht. Arabisch ist RTL; Zahlen und Rechnungen bleiben isoliert.
 - **Zielgruppe: Kinder** (Entscheidung 10.10.2026). Daraus folgt die Kinder-Kategorie im App Store: keine Tracker, keine Werbung, keine Analytik Dritter, keine externen Links und keine Käufe ohne Elternhürde. Das Spiel erfüllt das bereits, weil es ohne Netzwerk auskommt. Wichtig für die Darstellung: Es wird auf **Pratzen** geschlagen wie im Training, nicht auf einen Gegner. Kein Kampf, kein Treffer am Körper, keine Niederlage.
 
 ### Herkunft
@@ -106,7 +106,7 @@ Ladereihenfolge: `i18n.js`, `levels.js`, `storage.js`, `audio.js`, `game.js`, `m
 
 ---
 
-## 5. Stand Build 2
+## 5. Stand Build 3
 
 `node tools/pruefung.js` → **22 Prüfungen, 22 bestanden.** Die Prüfungen sind in `tools/pruefung.js` einzeln benannt (P01 bis P22) und decken Struktur, Syntax, Latenzregeln, Beatmap-Spielbarkeit, Textschlüssel, Bewertungslogik, Bedienung, iOS-Hülle und Darstellungsregeln ab.
 
@@ -123,9 +123,9 @@ Das ist die wichtigste Liste des ganzen Dokuments:
 - **Schwierigkeitskurve nie von Menschen gespielt.** Die Simulation beweist Spielbarkeit, nicht Spielspaß.
 - Sichere Bereiche auf Geräten mit Notch oder Dynamic Island nur im Code vorhanden, nie gesehen.
 
-### Gefundener Fehler, noch offen
+### Erledigt in Build 3
 
-`.github/workflows/validate.yml` ruft `boxreaktion/tools/pruefung.js` auf. Diesen Ordner gibt es im Repository nicht, das Prüfskript liegt unter `tools/pruefung.js`. Der GitHub-Workflow schlägt daher bei jedem Push fehl. Der Pfad stammt noch aus dem ZIP-Aufbau von Build 1.
+Der GitHub-Workflow rief einen Pfad auf, den es im Repository nicht gibt, und schlug bei jedem Push fehl. Repariert.
 
 ---
 
@@ -167,14 +167,15 @@ Das ist die wichtigste Liste des ganzen Dokuments:
 
 - **Zielgruppe: Kinder.** Kinder-Kategorie im App Store, Altersband noch festzulegen (6 bis 8 oder 9 bis 11). Tonfall und Farbwelt entsprechend.
 - **Alle zwölf Sprachen** kommen in den ersten Store-Build, nicht nur Deutsch und Englisch.
-- **Zuschnitt Build 3:** GitHub-Workflow repariert, elf weitere Sprachen ergänzt, erster Codemagic-Lauf. Alles Weitere erst nach dem Gerätetest.
+- **Name: Boxolo.** Untertitel „Reaktion und Rhythmus für Kinder" / „Reaction and rhythm for kids". Nur über Websuche geprüft, nicht über DPMA, EUIPO oder TMview.
+- **Build 3 ist gebaut:** Name, alle zwölf Sprachen, GitHub-Workflow. Einzelheiten in `DEPLOY_BUILD3.md`.
 
 ### Noch offen
 
-1. **Name.** „BeatBox" ist doppeldeutig (Beatboxing, Musikbox) und für Kinder nicht erklärend. Entscheidung über Markenname und Untertitel steht aus; davon hängt der Textschlüssel `app.titel` in allen zwölf Sprachen ab, deshalb vor der Übersetzung klären.
+1. **Markenprüfung Boxolo** in DPMAregister, EUIPO eSearch und TMview, Klassen 9 und 28.
 2. **Altersband** in App Store Connect: 6 bis 8 oder 9 bis 11 Jahre.
 3. **Musik.** Zurzeit nur erzeugte Klänge. Richtige Musikstücke wären spürbar besser, brauchen aber eine saubere Lizenz und würden die Regel „keine Audiodateien im Paket" aufheben.
-4. **Mehrsprachige Prüfung.** Trick der Rechenpyramide: Namen und Kurztexte in Japanisch, Chinesisch, Arabisch und Türkisch muttersprachlich gegenlesen lassen. Im Türkischen kein „hile" (bedeutet auch Schummeln).
+4. **Muttersprachliche Prüfung der elf Übersetzungen**, besonders Japanisch, Chinesisch, Arabisch und Türkisch. Sie sind maschinell erstellt und nicht gegengelesen.
 5. **Android.** Später über eine Kotlin-WebView-Hülle möglich, wie bei der Rechenpyramide geplant.
 
 ---

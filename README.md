@@ -1,6 +1,8 @@
-# BeatBox – Reaktionsspiel (Build 2)
+# Boxolo – Reaktionsspiel (Build 3)
 
 Sechs Trefferzonen in Boxnotation, fünf Modi, je zehn Level. Das Web-Paket ist reines HTML, CSS und JavaScript ohne Bibliotheken, ohne Build-Schritt, ohne Server; `index.html` im Browser öffnen genügt. Die iOS-Hülle in `ios/` bettet es unverändert in eine App mit WKWebView ein, `codemagic.yaml` baut daraus einen TestFlight-Build.
+
+**Build 3:** Name Boxolo (Anzeigename der App, Texte, Hilfe), alle zwölf Sprachen aktiv, GitHub-Workflow repariert.
 
 **Build 2:** iOS-Hülle (XcodeGen-Projekt, Swift, App-Symbol, Datenschutz-Manifest), Codemagic-Ablauf, Haptik-Brücke und Audiositzung im Web-Paket, Prüfung P22.
 
@@ -32,7 +34,7 @@ Ladereihenfolge: `i18n.js`, `levels.js`, `storage.js`, `audio.js`, `game.js`, `m
 
 Der Auftrag verlangte, offene Punkte selbst zu entscheiden. Das habe ich so gelöst:
 
-**Sprachen.** Abweichend vom Auftrag (Deutsch und Englisch) ist nach Vorgabe nur Deutsch aktiv, die Struktur ist auf zwölf Sprachen ausgelegt: `de, en, fr, es, it, pt, nl, pl, tr, ar, ja, zh` stehen als geplanter Umfang in `i18n.js`. Eine Sprache wird aktiv, sobald sie in `SPRACHEN` steht; der Sprachumschalter in den Einstellungen listet dann automatisch alle aktiven Sprachen. Jede Sprache trägt Leserichtung und Locale; `main.js` setzt `lang` und `dir` am Dokument, Zahlen stehen in isolierten Elementen (`unicode-bidi: isolate`), Zahlen und Datum werden über `Intl` formatiert. Das Prüfskript verlangt in jeder aktiven Sprache identische Schlüssel und identische Platzhalter. Einheiten hängen mit geschütztem Leerzeichen am Wert.
+**Sprachen.** Seit Build 3 sind alle zwölf Sprachen aktiv: `de, en, fr, es, it, pt, nl, pl, tr, ar, ja, zh` stehen als geplanter Umfang in `i18n.js`. Eine Sprache wird aktiv, sobald sie in `SPRACHEN` steht; der Sprachumschalter in den Einstellungen listet dann automatisch alle aktiven Sprachen. Jede Sprache trägt Leserichtung und Locale; `main.js` setzt `lang` und `dir` am Dokument, Zahlen stehen in isolierten Elementen (`unicode-bidi: isolate`), Zahlen und Datum werden über `Intl` formatiert. Das Prüfskript verlangt in jeder aktiven Sprache identische Schlüssel und identische Platzhalter. Einheiten hängen mit geschütztem Leerzeichen am Wert.
 
 **Klassische Skripte statt ES-Module.** Module werden bei `file://` in Chromium blockiert. Klassische Skripte laufen im Browser, in WKWebView und im Prüfskript (Node `vm`) gleich.
 
@@ -122,7 +124,7 @@ Diese Punkte konnte ich **nicht** prüfen:
 * **Schrift:** Die vorgesehene Schrift „Avenir Next Condensed“ gibt es nur auf Apple-Geräten; die Screenshots zeigen die Ersatzschrift.
 * **Sichere Bereiche auf Geräten mit Notch oder Dynamic Island** nicht gesehen, nur im Code vorhanden.
 * **Echte Menschen** haben die Schwierigkeitskurve nicht gespielt. Die Simulation beweist Spielbarkeit, nicht Spielspaß.
-* Weitere Sprachen außer Deutsch existieren noch nicht.
+* **Muttersprachliche Prüfung der elf Übersetzungen steht aus**, besonders Japanisch, Chinesisch, Arabisch und Türkisch.
 
 ## Testanleitung
 

@@ -4,7 +4,7 @@
 #
 # Vor dem ersten Build anpassen: PRODUCT_BUNDLE_IDENTIFIER (identisch in codemagic.yaml).
 
-name: BeatBox Reaction
+name: Boxolo
 
 options:
   deploymentTarget:
@@ -42,7 +42,7 @@ targets:
     info:
       path: BeatBox/Info.plist
       properties:
-        CFBundleDisplayName: BeatBox
+        CFBundleDisplayName: Boxolo
         CFBundleShortVersionString: $(MARKETING_VERSION)
         CFBundleVersion: $(CURRENT_PROJECT_VERSION)
         LSRequiresIPhoneOS: true
