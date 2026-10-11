@@ -155,11 +155,20 @@ Der GitHub-Workflow rief einen Pfad auf, den es im Repository nicht gibt, und sc
 
 ## 8. Offene Punkte (Öner)
 
-1. Codemagic: Anwendung aus dem Repository hinzufügen, API-Schlüssel unter dem Namen `BeatBox API-Schluessel` anlegen, Signierzertifikat und App-Store-Profil für `de.LaraJade.beatbox` hinterlegen.
-2. Apple Developer: App-ID `de.LaraJade.beatbox` registrieren, falls noch nicht geschehen.
-3. App Store Connect: Eintrag zur Apple-ID `6814647151` prüfen (Name, Primärsprache, SKU).
-4. Datenschutz- und Support-URL für den Store-Eintrag.
-5. Ersten TestFlight-Build auf dem iPhone durchspielen — das ist der einzige Weg, die Latenz und den Ton zu beurteilen.
+1. Codemagic: Anwendung hinzugefügt (11.10.2026, über die Repository-URL, weil das Repository öffentlich ist).
+2. **Signierung — offener Punkt.** Erster Build am 11.10.2026 scheiterte sofort mit
+   `No matching profiles found for bundle identifier "de.LaraJade.beatbox" and distribution type "app_store"`.
+   Der Block `ios_signing` in `codemagic.yaml` **holt** vorhandene Signierdateien aus dem
+   Apple Developer Portal, er legt keine an. Es muss dort also vorhanden sein:
+   App-ID `de.LaraJade.beatbox`, ein iOS-Distributionszertifikat und ein
+   App-Store-Bereitstellungsprofil für genau diese App-ID. Alternative: in `codemagic.yaml`
+   auf `app-store-connect fetch-signing-files "$BUNDLE_ID" --type IOS_APP_STORE --create`
+   umstellen; das legt Zertifikat und Profil selbst an, braucht aber zusätzlich die
+   Geheimvariable `CERTIFICATE_PRIVATE_KEY`.
+3. Apple Developer: App-ID `de.LaraJade.beatbox` registrieren, falls noch nicht geschehen.
+4. App Store Connect: Eintrag zur Apple-ID `6814647151` prüfen (Name, Primärsprache, SKU).
+5. Datenschutz- und Support-URL für den Store-Eintrag.
+6. Ersten TestFlight-Build auf dem iPhone durchspielen — das ist der einzige Weg, die Latenz und den Ton zu beurteilen.
 
 ---
 
