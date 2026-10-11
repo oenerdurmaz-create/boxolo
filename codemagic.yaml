@@ -10,6 +10,15 @@ workflows:
     name: BeatBox iOS TestFlight
     max_build_duration: 45
     instance_type: mac_mini_m2
+    # Jeder Push auf main startet automatisch einen Build fuer TestFlight.
+    triggering:
+      events:
+        - push
+      branch_patterns:
+        - pattern: main
+          include: true
+          source: true
+      cancel_previous_builds: true
     integrations:
       app_store_connect: Codemagic Rechenpyramide 2
     environment:

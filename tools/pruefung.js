@@ -708,6 +708,8 @@ pruefe('P22', 'iOS-Hülle: Dateien vollständig, stimmig mit Web-Paket, project.
   if (new Set(schluessel).size > 1) f.push('App-Store-Connect-Schlüssel heißt nicht überall gleich: ' + schluessel.join(' | '));
   if (schluessel.indexOf('BeatBox API-Schluessel') >= 0) f.push('Platzhaltername für den App-Store-Connect-Schlüssel steht noch in codemagic.yaml');
   if (cm.indexOf('node tools/pruefung.js --release') < 0) f.push('codemagic.yaml führt das Prüfskript nicht aus');
+  /* Ohne triggering baut Codemagic nur auf Knopfdruck, ein Push auf main bewirkt nichts. */
+  if (!/name: BeatBox iOS TestFlight[\s\S]*?triggering:\s*\n\s+events:\s*\n\s+- push\s*\n\s+branch_patterns:\s*\n\s+- pattern: main[\s\S]*?\n  signierung-pruefen:/.test(cm)) f.push('codemagic.yaml: Push auf main startet keinen TestFlight-Build (triggering fehlt)');
   if (cm.indexOf('xcodegen generate') < 0) f.push('codemagic.yaml erzeugt das Xcode-Projekt nicht');
   if (!/--scheme BeatBox\b/.test(cm) || !/^schemes:\s*\n\s+BeatBox:/m.test(yml)) f.push('Schema BeatBox nicht in beiden Dateien');
   /* XcodeGen benennt die erzeugte .xcodeproj nach "name" in project.yml.
