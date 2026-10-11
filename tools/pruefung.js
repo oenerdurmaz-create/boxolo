@@ -668,6 +668,18 @@ pruefe('P22', 'iOS-Hülle: Dateien vollständig, stimmig mit Web-Paket, project.
     if (auf !== zu) f.push('Swift: Klammern ' + k[0] + k[1] + ' unausgeglichen');
   });
   if (!/class SceneDelegate/.test(swift) || yml.indexOf('$(PRODUCT_MODULE_NAME).SceneDelegate') < 0) f.push('SceneDelegate nicht verdrahtet');
+  /* XcodeGen nimmt alles unter ios/BeatBox auf, auch Unterordner. Alte Swift-Dateien
+     (z. B. ios/BeatBox/Sources/AppDelegate.swift aus Build 1) führen sonst zu
+     "Filename used twice" bzw. zwei @main. Nur die fünf bekannten Swift-Dateien sind erlaubt. */
+  (function swiftDateien(dir) {
+    fs.readdirSync(path.join(WURZEL, dir), { withFileTypes: true }).forEach(function (e) {
+      const rel = dir + '/' + e.name;
+      if (e.isDirectory()) { if (!/\.(xcassets|lproj)$/.test(e.name)) swiftDateien(rel); return; }
+      if (/\.swift$/.test(e.name) && ['AppDelegate', 'SceneDelegate', 'Audiositzung', 'WebDateiHandler', 'SpielViewController']
+        .map(function (n) { return 'ios/BeatBox/' + n + '.swift'; }).indexOf(rel) < 0) f.push('unerwartete Swift-Datei (doppelt oder veraltet): ' + rel);
+    });
+  })('ios/BeatBox');
+  if ((swift.match(/@main\b/g) || []).length !== 1) f.push('@main muss genau einmal vorkommen');
   if (!/@main/.test(swift)) f.push('@main fehlt');
 
   /* Pflichtangaben für App Store und Build-Nummer */
