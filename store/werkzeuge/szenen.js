@@ -1,9 +1,9 @@
 /* Nimmt sechs Szenen je Sprache aus der echten App auf. */
 const { chromium } = require('playwright');
 const fs = require('fs');
-const OUT = '/tmp/claude-0/-home-claude-beatbox/ede55496-b311-53ed-98a9-6b243fe10608/scratchpad/roh';
+const OUT = '/tmp/claude-0/-home-claude-beatbox/ede55496-b311-53ed-98a9-6b243fe10608/scratchpad/roh/' + Number(process.argv[2] || 1040);
 const SPRACHEN = ['ar', 'zh', 'nl', 'en', 'fr', 'de', 'it', 'ja', 'pl', 'pt', 'es', 'tr'];
-const BREITE = 1040;
+const BREITE = Number(process.argv[2] || 1040);
 const SKALA = BREITE / 375;
 
 fs.mkdirSync(OUT, { recursive: true });

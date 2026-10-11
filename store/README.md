@@ -1,14 +1,27 @@
 # Boxolo – Screenshots für App Store Connect
 
-84 Bilder: 12 Sprachen × 7 Bilder.
+168 Bilder: 2 Größen × 12 Sprachen × 7 Bilder. PNG, RGB, **ohne Alphakanal**.
 
-**Format:** 1320 × 2868 Pixel, Hochformat, PNG ohne Alphakanal.
-Das ist die 6,9-Zoll-Größe. Sie ist die einzige Pflichtgröße; Apple
-rechnet alle kleineren iPhone-Klassen daraus herunter.
+## Welcher Ordner gehört in welches Feld
 
-**Ordner:** nummeriert in der Reihenfolge des Sprach-Aufklappmenüs von
-App Store Connect. Innerhalb eines Ordners sind die Bilder 1 bis 7 in
-der Reihenfolge nummeriert, in der sie hochgeladen werden sollen.
+App Store Connect benennt die Felder seit 2025 nicht mehr nach Zoll,
+sondern nach Gerätefamilie. Ein Bild mit der falschen Pixelgröße wird
+mit „File dimensions are invalid" abgelehnt.
+
+| Ordner | Feld in App Store Connect | Pflicht |
+|---|---|---|
+| `6.3-inch_1206x2622_PFLICHT` | iPhone with Dynamic Island (medium display) | **ja, immer** |
+| `6.9-inch_1320x2868` | iPhone with Dynamic Island (large display) | ja, sofern kein Face-ID-Satz hochgeladen wird |
+
+Alle übrigen Felder sind freiwillig. Apple rechnet sie aus dem
+nächstgelegenen vorhandenen Satz herunter.
+
+## Reihenfolge
+
+Die Sprachordner sind in der Reihenfolge des Sprach-Aufklappmenüs
+nummeriert, `01_Arabic` bis `12_Turkish`. Innerhalb eines Ordners sind
+die Bilder 1 bis 7 in der Reihenfolge nummeriert, in der sie
+hochgeladen werden sollen.
 
 | Nr. | Bild | Überschrift (immer Englisch) |
 |---|---|---|
@@ -24,18 +37,20 @@ Die Oberfläche im Bild ist jeweils in der Sprache des Ordners, die
 Überschrift darüber bleibt laut Vorgabe englisch.
 
 Alle Bilder stammen aus der echten App (Build 3), nicht aus einer
-Nachbildung. Die gezeigten Bestenlisten und die Verlaufskurve sind
+Nachbildung, und sind in beiden Größen einzeln gerendert statt
+hochskaliert. Die gezeigten Bestenlisten und die Verlaufskurve sind
 Beispieldaten.
 
 ## Neu erzeugen
 
-Die 84 PNG-Dateien liegen **nicht** im Repository (15 MB). Sie werden aus
+Die 168 PNG-Dateien liegen **nicht** im Repository (26 MB). Sie werden aus
 dem echten Spielstand erzeugt:
 
 ```
-node store/werkzeuge/szenen.js    # Rohaufnahmen, 12 Sprachen × 7 Szenen
-python3 store/werkzeuge/rahmen.py # Rahmen 1320 × 2868 mit englischer Überschrift
-python3 store/werkzeuge/texte.py  # Textdateien, prüft die Apple-Grenzen
+node store/werkzeuge/szenen.js 1040   # Rohaufnahmen für 1320 × 2868
+node store/werkzeuge/szenen.js 950    # Rohaufnahmen für 1206 × 2622
+python3 store/werkzeuge/rahmen.py     # Rahmen beider Größen, prüft die Maße
+python3 store/werkzeuge/texte.py      # Textdateien, prüft die Apple-Grenzen
 ```
 
 Nach jeder Änderung am Spiel, die man sieht, gehören die Bilder neu erzeugt.
