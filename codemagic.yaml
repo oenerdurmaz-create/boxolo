@@ -1,6 +1,8 @@
 # BeatBox – Codemagic-Ablauf für TestFlight.
 # Vor dem ersten Start drei Platzhalter ersetzen (siehe README, Abschnitt iOS):
-#   1. app_store_connect: Name des App-Store-Connect-API-Schlüssels in Codemagic
+#   1. app_store_connect: Name des App-Store-Connect-API-Schlüssels, genau wie in
+#      Codemagic unter Settings -> Integrations -> Developer Portal. Ein Schlüssel
+#      gilt für das ganze Apple-Konto, pro App braucht es keinen eigenen.
 #   2. bundle_identifier: identisch mit PRODUCT_BUNDLE_IDENTIFIER in ios/project.yml
 #   3. APP_STORE_APPLE_ID: Apple-ID der App aus App Store Connect (App-Informationen)
 workflows:
@@ -9,7 +11,7 @@ workflows:
     max_build_duration: 45
     instance_type: mac_mini_m2
     integrations:
-      app_store_connect: BeatBox API-Schluessel
+      app_store_connect: Codemagic Rechenpyramide 2
     environment:
       ios_signing:
         distribution_type: app_store
@@ -52,7 +54,7 @@ workflows:
     max_build_duration: 15
     instance_type: mac_mini_m2
     integrations:
-      app_store_connect: BeatBox API-Schluessel
+      app_store_connect: Codemagic Rechenpyramide 2
     scripts:
       - name: Welches Team sieht der Schlüssel
         script: |

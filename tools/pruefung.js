@@ -685,6 +685,16 @@ pruefe('P22', 'iOS-Hülle: Dateien vollständig, stimmig mit Web-Paket, project.
   if (lies('ios/BeatBox/Assets.xcassets/AppIcon.appiconset/Contents.json').indexOf('"AppIcon.png"') < 0) f.push('AppIcon.png nicht im Asset-Katalog eingetragen');
 
   /* Codemagic-Ablauf */
+  /* Der Name des App-Store-Connect-Schlüssels muss in jedem Ablauf derselbe sein
+     und darf kein Platzhalter mehr sein. Ein falscher Name führt zu
+     "No matching profiles found", nicht zu einer Meldung über den Schlüssel. */
+  const schluessel = cm.split('\n')
+    .filter(function (z) { return z.trim().indexOf('#') !== 0; })
+    .map(function (z) { return (z.match(/^\s*app_store_connect:\s*(\S.*?)\s*$/) || [])[1]; })
+    .filter(function (z) { return z; });
+  if (!schluessel.length) f.push('codemagic.yaml nennt keinen App-Store-Connect-Schlüssel');
+  if (new Set(schluessel).size > 1) f.push('App-Store-Connect-Schlüssel heißt nicht überall gleich: ' + schluessel.join(' | '));
+  if (schluessel.indexOf('BeatBox API-Schluessel') >= 0) f.push('Platzhaltername für den App-Store-Connect-Schlüssel steht noch in codemagic.yaml');
   if (cm.indexOf('node tools/pruefung.js --release') < 0) f.push('codemagic.yaml führt das Prüfskript nicht aus');
   if (cm.indexOf('xcodegen generate') < 0) f.push('codemagic.yaml erzeugt das Xcode-Projekt nicht');
   if (!/--scheme BeatBox\b/.test(cm) || !/^schemes:\s*\n\s+BeatBox:/m.test(yml)) f.push('Schema BeatBox nicht in beiden Dateien');
