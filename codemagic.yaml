@@ -60,14 +60,10 @@ workflows:
         script: |
           set +e
           echo "=== Bundle-IDs im Konto ==="
-          app-store-connect list-bundle-ids
-          echo "=== Bundle-ID de.LaraJade.beatbox ==="
-          app-store-connect list-bundle-ids --bundle-id-identifier de.LaraJade.beatbox
-          echo "=== Distributionszertifikate ==="
-          app-store-connect list-certificates --type IOS_DISTRIBUTION
-          echo "=== Profile vom Typ IOS_APP_STORE ==="
-          app-store-connect list-profiles --profile-type IOS_APP_STORE
-          echo "=== Profile zu de.LaraJade.beatbox ==="
-          app-store-connect list-profiles --bundle-id-identifier de.LaraJade.beatbox
+          app-store-connect bundle-ids list
+          echo "=== Alle Signierzertifikate (ohne Filter) ==="
+          app-store-connect certificates list
+          echo "=== Alle Bereitstellungsprofile (ohne Filter) ==="
+          app-store-connect profiles list
           echo "=== Ende ==="
           exit 0
