@@ -688,7 +688,21 @@ pruefe('P22', 'iOS-Hülle: Dateien vollständig, stimmig mit Web-Paket, project.
   if (cm.indexOf('node tools/pruefung.js --release') < 0) f.push('codemagic.yaml führt das Prüfskript nicht aus');
   if (cm.indexOf('xcodegen generate') < 0) f.push('codemagic.yaml erzeugt das Xcode-Projekt nicht');
   if (!/--scheme BeatBox\b/.test(cm) || !/^schemes:\s*\n\s+BeatBox:/m.test(yml)) f.push('Schema BeatBox nicht in beiden Dateien');
-  if (lies('.gitignore').indexOf('ios/BeatBox.xcodeproj/') < 0) f.push('.gitignore schließt das erzeugte Xcode-Projekt nicht aus');
+  /* XcodeGen benennt die erzeugte .xcodeproj nach "name" in project.yml.
+     Weicht dieser Name von dem ab, den codemagic.yaml baut, bricht der Build
+     erst im letzten Schritt ab. Deshalb hier maschinell gegengeprüft. */
+  const projName = (yml.match(/^name:\s*(\S+)\s*$/m) || [])[1];
+  if (!projName) {
+    f.push('project.yml hat kein auswertbares Feld name');
+  } else {
+    const erwartet = 'ios/' + projName + '.xcodeproj';
+    if (cm.indexOf(erwartet) < 0) {
+      f.push('codemagic.yaml baut nicht ' + erwartet + ' (project.yml heißt "' + projName + '")');
+    }
+    if (lies('.gitignore').indexOf(erwartet + '/') < 0) {
+      f.push('.gitignore schließt ' + erwartet + ' nicht aus');
+    }
+  }
   return f;
 });
 

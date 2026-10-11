@@ -1,10 +1,14 @@
-# BeatBox – iOS-Hülle.
+# Boxolo – iOS-Hülle.
 # Aus dieser Datei erzeugt XcodeGen das Xcode-Projekt:  cd ios && xcodegen generate
 # Die erzeugte BeatBox.xcodeproj und die Info.plist werden nicht eingecheckt.
 #
-# Vor dem ersten Build anpassen: PRODUCT_BUNDLE_IDENTIFIER (identisch in codemagic.yaml).
+# ACHTUNG: "name" unten bestimmt den Dateinamen der erzeugten .xcodeproj. Er muss
+# zu dem Pfad passen, den codemagic.yaml baut, und zu .gitignore. Prüfung P22
+# erzwingt das. Der Name, den Nutzer sehen, ist CFBundleDisplayName (Boxolo) –
+# nicht dieser hier. Ziel-, Schema- und Ordnername bleiben BeatBox, weil daran
+# das URL-Schema beatbox:// und damit der gespeicherte Spielstand hängt.
 
-name: Boxolo
+name: BeatBox
 
 options:
   deploymentTarget:
