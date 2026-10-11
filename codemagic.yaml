@@ -41,3 +41,31 @@ workflows:
       app_store_connect:
         auth: integration
         submit_to_testflight: true
+
+  # Diagnose-Ablauf. Baut nichts und lädt nichts hoch, sondern fragt nur ab,
+  # was der App-Store-Connect-Schlüssel im Developer Portal tatsächlich sieht.
+  # Absichtlich OHNE ios_signing, denn dieser Block wird vor den Skripten
+  # aufgelöst und bricht den Lauf sonst ab, bevor etwas ausgegeben wird.
+  # Nutzen, wenn "No matching profiles found" auftritt.
+  signierung-pruefen:
+    name: Signierung prüfen (Diagnose)
+    max_build_duration: 15
+    instance_type: mac_mini_m2
+    integrations:
+      app_store_connect: BeatBox API-Schluessel
+    scripts:
+      - name: Welches Team sieht der Schlüssel
+        script: |
+          set +e
+          echo "=== Bundle-IDs im Konto ==="
+          app-store-connect list-bundle-ids
+          echo "=== Bundle-ID de.LaraJade.beatbox ==="
+          app-store-connect list-bundle-ids --bundle-id-identifier de.LaraJade.beatbox
+          echo "=== Distributionszertifikate ==="
+          app-store-connect list-certificates --type IOS_DISTRIBUTION
+          echo "=== Profile vom Typ IOS_APP_STORE ==="
+          app-store-connect list-profiles --profile-type IOS_APP_STORE
+          echo "=== Profile zu de.LaraJade.beatbox ==="
+          app-store-connect list-profiles --bundle-id-identifier de.LaraJade.beatbox
+          echo "=== Ende ==="
+          exit 0
