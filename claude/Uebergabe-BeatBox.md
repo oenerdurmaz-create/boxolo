@@ -9,7 +9,7 @@
 ## 1. Projekt in Kürze
 
 - iPhone-Spiel **„Boxolo"** (Anzeigename seit Build 3; interne Bezeichner, Bundle-ID und URL-Schema heißen weiterhin BeatBox) — Reaktions- und Rhythmusspiel. Sechs Trefferzonen in Boxnotation, der Spieler tippt sie so schnell und so genau wie möglich an. Gemessen werden Reaktionszeit in Millisekunden, Trefferquote und Serienlänge.
-- Repo: https://github.com/oenerdurmaz-create/beatbox (Branch `main`, privat). Arbeit nur per Git (commit + push), keine ZIPs.
+- Repo: https://github.com/oenerdurmaz-create/boxolo (Branch `main`, **öffentlich** seit 11.10.2026; vorher privat und unter dem Namen `beatbox`). Arbeit nur per Git (commit + push), keine ZIPs.
 - Bundle-ID: `de.LaraJade.beatbox`. Apple-ID der App in App Store Connect: `6814647151`. Version 1.0, iOS 16+, nur iPhone, nur Hochformat.
 - Architektur wie Rechenpyramide: **native Hülle + WKWebView**, gesamte Spiellogik im Web-Paket (HTML/CSS/JavaScript, keine Bibliotheken, kein Build-Schritt). Besonderheit gegenüber der Rechenpyramide: Die Web-Dateien werden über ein eigenes URL-Schema `beatbox://localhost/` ausgeliefert statt über `file://`, damit `localStorage` eine stabile Herkunft hat und erhalten bleibt.
 - Das Xcode-Projekt wird aus `ios/project.yml` per **XcodeGen** erzeugt und ist bewusst **nicht** eingecheckt.
