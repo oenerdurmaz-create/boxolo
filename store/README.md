@@ -51,6 +51,7 @@ node store/werkzeuge/szenen.js 1040   # Rohaufnahmen für 1320 × 2868
 node store/werkzeuge/szenen.js 950    # Rohaufnahmen für 1206 × 2622
 python3 store/werkzeuge/rahmen.py     # Rahmen beider Größen, prüft die Maße
 python3 store/werkzeuge/texte.py      # Textdateien, prüft die Apple-Grenzen
+python3 store/werkzeuge/kreativ.py    # Header und Suchergebnis-Bild
 ```
 
 Nach jeder Änderung am Spiel, die man sieht, gehören die Bilder neu erzeugt.
@@ -62,3 +63,15 @@ vor dem Lauf anzupassen.
 `store/texte/` enthält je Sprache eine Datei mit Promotional Text,
 Description, Keywords und Subtitle, jeweils mit der Zeichenzahl im
 Zwischentitel. `texte.py` bricht ab, wenn eine Grenze überschritten ist.
+
+## Creative Assets (Feld „Header and Search Results")
+
+Freiwillig, erzeugt von `store/werkzeuge/kreativ.py`:
+
+| Datei | Platzierung | Maße |
+|---|---|---|
+| `Header_3840x1646_21-9.png` | Product page header, 21:9 | 3840 × 1646 |
+| `SearchResult_3840x2560_3-2.png` | Search results, 3:2 | 3840 × 2560 |
+
+Beide in Englisch, damit ein Satz für alle zwölf Sprachen genügt. Ohne
+Suchergebnis-Bild zeigt der App Store in der Suche die Screenshots.
