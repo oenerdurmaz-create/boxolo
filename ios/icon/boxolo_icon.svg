@@ -1,0 +1,52 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1024" height="1024" viewBox="0 0 1024 1024">
+  <!-- Boxolo App-Icon: Pratze mit Timing-Ring, Handschuh trifft von links unten.
+       Vollflaechig, ohne Transparenz, ohne Text; Ecken rundet iOS selbst ab. -->
+  <defs>
+    <radialGradient id="bg" cx="55%" cy="35%" r="80%">
+      <stop offset="0" stop-color="#21508f"/>
+      <stop offset="0.55" stop-color="#14305b"/>
+      <stop offset="1" stop-color="#0a1830"/>
+    </radialGradient>
+    <radialGradient id="pad" cx="40%" cy="34%" r="72%">
+      <stop offset="0" stop-color="#ff8378"/>
+      <stop offset="0.55" stop-color="#e5484d"/>
+      <stop offset="1" stop-color="#a92531"/>
+    </radialGradient>
+    <radialGradient id="glove" cx="38%" cy="28%" r="85%">
+      <stop offset="0" stop-color="#ffe08a"/>
+      <stop offset="0.5" stop-color="#f2b544"/>
+      <stop offset="1" stop-color="#c4841a"/>
+    </radialGradient>
+  </defs>
+  <rect width="1024" height="1024" fill="url(#bg)"/>
+
+  <!-- Timing-Ring -->
+  <circle cx="600" cy="420" r="318" fill="none" stroke="#3ddc97" stroke-width="36"
+          stroke-dasharray="1480 520" stroke-linecap="round" transform="rotate(-150 600 420)"/>
+
+  <!-- Pratze (Schlagpolster) -->
+  <circle cx="600" cy="420" r="238" fill="url(#pad)"/>
+  <circle cx="600" cy="420" r="150" fill="none" stroke="#f2ebdd" stroke-width="30"/>
+  <circle cx="600" cy="420" r="62" fill="#f2ebdd"/>
+
+  <!-- Handschuh, Faust zeigt nach rechts oben auf die Pratze -->
+  <g transform="translate(330 690) rotate(-42)">
+    <!-- Buendchen -->
+    <rect x="-118" y="70" width="236" height="150" rx="40" fill="#f2ebdd"/>
+    <rect x="-118" y="70" width="236" height="34" rx="14" fill="#cfc4b0"/>
+    <!-- Faust -->
+    <path d="M-128 88 C-160 -40 -120 -190 10 -205 C150 -220 200 -110 178 -10 C168 40 140 80 110 92 L-128 92 Z" fill="url(#glove)"/>
+    <!-- Daumen -->
+    <path d="M-138 70 C-160 10 -150 -60 -105 -70 C-70 -78 -55 -40 -62 0 C-68 40 -85 72 -110 82 C-125 88 -134 82 -138 70 Z" fill="#d9952a"/>
+    <path d="M-58 -10 C-20 -30 40 -30 90 -8" fill="none" stroke="#c4841a" stroke-width="10" stroke-linecap="round" opacity="0.8"/>
+    <!-- Glanz -->
+    <path d="M-30 -175 C60 -185 125 -140 140 -70" fill="none" stroke="#fff3c9" stroke-width="24" stroke-linecap="round" opacity="0.75"/>
+  </g>
+
+  <!-- Trefferfunken an der Kontaktstelle -->
+  <g stroke="#f2ebdd" stroke-width="28" stroke-linecap="round">
+    <line x1="300" y1="350" x2="252" y2="318"/>
+    <line x1="270" y1="440" x2="212" y2="440"/>
+    <line x1="420" y1="245" x2="392" y2="196"/>
+  </g>
+</svg>
